@@ -10,25 +10,79 @@ var agent_data: Array[Dictionary] = [
 	{"name": "Eve", "personality": "lazy", "color": Color(0.9, 0.3, 0.6)},
 ]
 
-var agents: Array[Node2D] = []
+var agents: Array = []
+
+var zone_rects: Dictionary = {
+	"park": Rect2(10, 10, 580, 380),
+	"cafe": Rect2(610, 10, 580, 380),
+	"town_square": Rect2(10, 410, 1180, 380),
+}
 
 @onready var agent_container: Node2D = $AgentContainer
 @onready var ui_panel: VBoxContainer = $UIPanel
+@onready var nav_region: NavigationRegion2D = $NavigationRegion2D
 
 func _ready() -> void:
 	randomize()
+	_setup_navigation()
+	_setup_wall_shapes()
+	# Wait one frame for navigation to bake
+	await get_tree().physics_frame
 	_spawn_agents()
 
+func _setup_navigation() -> void:
+	var nav_poly: NavigationPolygon = NavigationPolygon.new()
+	var outline: PackedVector2Array = PackedVector2Array([
+		Vector2(10, 10),
+		Vector2(1190, 10),
+		Vector2(1190, 790),
+		Vector2(10, 790),
+	])
+	nav_poly.add_outline(outline)
+	# Use modern API to avoid deprecation warning
+	var source_geo: NavigationMeshSourceGeometryData2D = NavigationMeshSourceGeometryData2D.new()
+	NavigationServer2D.parse_source_geometry_data(nav_poly, source_geo, nav_region)
+	NavigationServer2D.bake_from_source_geometry_data(nav_poly, source_geo)
+	nav_region.navigation_polygon = nav_poly
+
+func _setup_wall_shapes() -> void:
+	# Top wall
+	var top_shape: WorldBoundaryShape2D = WorldBoundaryShape2D.new()
+	top_shape.normal = Vector2(0, 1)
+	top_shape.distance = 5
+	$Walls/WallTop/CollisionShape2D.shape = top_shape
+	# Bottom wall
+	var bot_shape: WorldBoundaryShape2D = WorldBoundaryShape2D.new()
+	bot_shape.normal = Vector2(0, -1)
+	bot_shape.distance = -795
+	$Walls/WallBottom/CollisionShape2D.shape = bot_shape
+	# Left wall
+	var left_shape: WorldBoundaryShape2D = WorldBoundaryShape2D.new()
+	left_shape.normal = Vector2(1, 0)
+	left_shape.distance = 5
+	$Walls/WallLeft/CollisionShape2D.shape = left_shape
+	# Right wall
+	var right_shape: WorldBoundaryShape2D = WorldBoundaryShape2D.new()
+	right_shape.normal = Vector2(-1, 0)
+	right_shape.distance = -1195
+	$Walls/WallRight/CollisionShape2D.shape = right_shape
+
 func _spawn_agents() -> void:
-	for data in agent_data:
-		var agent: Node2D = AgentScene.instantiate()
+	var spawn_positions: Array[Vector2] = [
+		Vector2(200, 200),   # Park
+		Vector2(300, 300),   # Park
+		Vector2(800, 200),   # Cafe
+		Vector2(600, 600),   # Town Square
+		Vector2(900, 600),   # Town Square
+	]
+	for i in range(agent_data.size()):
+		var data: Dictionary = agent_data[i]
+		var agent = AgentScene.instantiate()
 		agent.agent_name = data["name"]
 		agent.personality = data["personality"]
 		agent.agent_color = data["color"]
-		agent.position = Vector2(
-			randf_range(80, 720),
-			randf_range(80, 520)
-		)
+		agent.position = spawn_positions[i]
+		agent.zone_rects = zone_rects
 		agent.interaction_started.connect(_on_agent_interaction)
 		agent.state_changed.connect(_on_agent_state_changed)
 		agent_container.add_child(agent)
@@ -41,8 +95,8 @@ func _physics_process(_delta: float) -> void:
 			if agent != other:
 				agent.check_nearby(other)
 
-func _on_agent_interaction(agent_name: String, other_name: String) -> void:
-	ui_panel.log_interaction(agent_name, other_name)
+func _on_agent_interaction(agent_name: String, other_name: String, dialogue: String) -> void:
+	ui_panel.log_interaction(agent_name, other_name, dialogue)
 
-func _on_agent_state_changed(agent_name: String, state: String) -> void:
-	ui_panel.update_agent_state(agent_name, state)
+func _on_agent_state_changed(agent_name: String, new_state: String) -> void:
+	ui_panel.update_agent_state(agent_name, new_state)

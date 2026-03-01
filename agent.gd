@@ -1,135 +1,258 @@
-extends Node2D
+extends CharacterBody2D
 
-signal interaction_started(agent_name: String, other_name: String)
+signal interaction_started(agent_name: String, other_name: String, dialogue: String)
 signal state_changed(agent_name: String, state: String)
+
+enum State { IDLE, WANDER, SEEK, INTERACT, MOVING_TO_ZONE }
 
 @export var agent_name: String = "Agent"
 @export var personality: String = "curious"
 @export var agent_color: Color = Color.WHITE
 
-var velocity: Vector2 = Vector2.ZERO
+var state: State = State.IDLE
 var speed: float = 60.0
-var wander_timer: float = 0.0
-var wander_interval: float = 2.0
-var state: String = "wandering"
+var idle_timer: float = 0.0
+var interact_timer: float = 0.0
 var interaction_cooldown: float = 0.0
-var flash_timer: float = 0.0
-var base_color: Color
-var thought_timer: float = 0.0
-var detection_radius: float = 100.0
+var seek_target: CharacterBody2D = null
+var speech_timer: float = 0.0
+var current_zone: String = ""
 
-var bounds_min: Vector2 = Vector2(20, 20)
-var bounds_max: Vector2 = Vector2(780, 580)
+# Zone definitions (set by main.gd)
+var zone_rects: Dictionary = {}
 
+@onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
+@onready var sprite: Sprite2D = $Sprite2D
 @onready var name_label: Label = $NameLabel
-@onready var thought_label: Label = $ThoughtLabel
+@onready var speech_bubble: PanelContainer = $SpeechBubble
+@onready var speech_label: Label = $SpeechBubble/SpeechLabel
+@onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
 func _ready() -> void:
-	base_color = agent_color
-	name_label.text = agent_name
-	thought_label.text = ""
-	thought_label.visible = false
-	_pick_new_direction()
+	# Create programmatic sprite texture
+	var img: Image = Image.create(20, 28, false, Image.FORMAT_RGBA8)
+	img.fill(agent_color)
+	var tex: ImageTexture = ImageTexture.create_from_image(img)
+	sprite.texture = tex
 
-func _draw() -> void:
-	var draw_color: Color = agent_color
-	if flash_timer > 0.0:
-		draw_color = Color.YELLOW
-	draw_circle(Vector2.ZERO, 12, draw_color)
-	draw_arc(Vector2.ZERO, detection_radius, 0, TAU, 32, Color(agent_color, 0.1), 1.0)
+	# Set collision shape
+	var shape: RectangleShape2D = RectangleShape2D.new()
+	shape.size = Vector2(18, 26)
+	collision_shape.shape = shape
+
+	name_label.text = agent_name
+	speech_bubble.visible = false
+
+	# Apply speed modifier based on personality
+	match personality:
+		"lazy":
+			speed = 30.0
+		"wanderer":
+			speed = 85.0
+		"shy":
+			speed = 50.0
+		"curious":
+			speed = 60.0
+		"social":
+			speed = 65.0
+
+	# Start in IDLE
+	_enter_idle()
+
+func get_state_name() -> String:
+	match state:
+		State.IDLE:
+			return "idle"
+		State.WANDER:
+			return "wander"
+		State.SEEK:
+			return "seek"
+		State.INTERACT:
+			return "interact"
+		State.MOVING_TO_ZONE:
+			return "moving_to_zone"
+	return "unknown"
 
 func _physics_process(delta: float) -> void:
-	# Wander logic
-	wander_timer -= delta
-	if wander_timer <= 0.0:
-		_pick_new_direction()
-
-	# Apply personality-based speed modifier
-	var speed_mod: float = _get_speed_modifier()
-	position += velocity * speed_mod * delta
-
-	# Keep in bounds with steering
-	_steer_in_bounds()
+	# Speech bubble timer
+	if speech_timer > 0.0:
+		speech_timer -= delta
+		if speech_timer <= 0.0:
+			speech_bubble.visible = false
 
 	# Interaction cooldown
 	if interaction_cooldown > 0.0:
 		interaction_cooldown -= delta
-		if interaction_cooldown <= 0.0 and state == "interacting":
-			state = "wandering"
-			state_changed.emit(agent_name, state)
 
-	# Flash timer
-	if flash_timer > 0.0:
-		flash_timer -= delta
-		queue_redraw()
+	# Update current zone
+	_update_current_zone()
 
-	# Thought fade
-	if thought_timer > 0.0:
-		thought_timer -= delta
-		var alpha: float = clampf(thought_timer / 0.5, 0.0, 1.0) if thought_timer < 0.5 else 1.0
-		thought_label.modulate.a = alpha
-		if thought_timer <= 0.0:
-			thought_label.visible = false
+	match state:
+		State.IDLE:
+			_process_idle(delta)
+		State.WANDER:
+			_process_wander(delta)
+		State.SEEK:
+			_process_seek(delta)
+		State.INTERACT:
+			_process_interact(delta)
+		State.MOVING_TO_ZONE:
+			_process_moving_to_zone(delta)
 
-func _pick_new_direction() -> void:
-	var angle: float = randf() * TAU
-	velocity = Vector2(cos(angle), sin(angle)) * speed
-	wander_interval = randf_range(1.5, 3.5)
-	wander_timer = wander_interval
+func _update_current_zone() -> void:
+	for zone_name in zone_rects:
+		var rect: Rect2 = zone_rects[zone_name]
+		if rect.has_point(position):
+			current_zone = zone_name
+			return
+	current_zone = ""
 
-func _get_speed_modifier() -> float:
-	match personality:
-		"lazy":
-			return 0.4
-		"wanderer":
-			return 1.4
-		"shy":
-			return 0.8
-		"curious":
-			return 1.0
-		"social":
-			return 1.1
-	return 1.0
+# --- IDLE ---
+func _enter_idle() -> void:
+	state = State.IDLE
+	idle_timer = randf_range(2.0, 3.0)
+	velocity = Vector2.ZERO
+	state_changed.emit(agent_name, "idle")
 
-func _steer_in_bounds() -> void:
-	var margin: float = 30.0
-	var steer: Vector2 = Vector2.ZERO
+func _process_idle(delta: float) -> void:
+	idle_timer -= delta
+	if idle_timer <= 0.0:
+		# Decide next action
+		var roll: float = randf()
+		if roll < 0.15:
+			_enter_moving_to_zone()
+		else:
+			_enter_wander()
 
-	if position.x < bounds_min.x + margin:
-		steer.x += 1.0
-	elif position.x > bounds_max.x - margin:
-		steer.x -= 1.0
+# --- WANDER ---
+func _enter_wander() -> void:
+	state = State.WANDER
+	_pick_wander_target()
+	state_changed.emit(agent_name, "wander")
 
-	if position.y < bounds_min.y + margin:
-		steer.y += 1.0
-	elif position.y > bounds_max.y - margin:
-		steer.y -= 1.0
+func _pick_wander_target() -> void:
+	# Pick a random point within current zone (or nearby)
+	var target_pos: Vector2
+	if current_zone != "" and zone_rects.has(current_zone):
+		var rect: Rect2 = zone_rects[current_zone]
+		target_pos = Vector2(
+			randf_range(rect.position.x + 20, rect.end.x - 20),
+			randf_range(rect.position.y + 20, rect.end.y - 20)
+		)
+	else:
+		target_pos = position + Vector2(randf_range(-100, 100), randf_range(-100, 100))
+		target_pos.x = clampf(target_pos.x, 30, 1170)
+		target_pos.y = clampf(target_pos.y, 30, 770)
+	nav_agent.target_position = target_pos
 
-	if steer != Vector2.ZERO:
-		velocity = velocity.lerp(steer.normalized() * speed, 0.1)
+func _process_wander(_delta: float) -> void:
+	if nav_agent.is_navigation_finished():
+		_enter_idle()
+		return
+	_move_toward_nav_target()
 
-	position.x = clampf(position.x, bounds_min.x, bounds_max.x)
-	position.y = clampf(position.y, bounds_min.y, bounds_max.y)
+# --- SEEK ---
+func _enter_seek(target: CharacterBody2D) -> void:
+	state = State.SEEK
+	seek_target = target
+	nav_agent.target_position = target.position
+	state_changed.emit(agent_name, "seek")
 
-func check_nearby(other: Node2D) -> void:
-	if other == self:
+func _process_seek(_delta: float) -> void:
+	if seek_target == null or not is_instance_valid(seek_target):
+		_enter_wander()
+		return
+	nav_agent.target_position = seek_target.position
+	var dist: float = position.distance_to(seek_target.position)
+	if dist < 35.0:
+		_enter_interact(seek_target)
+		return
+	if dist > 200.0:
+		_enter_wander()
+		return
+	_move_toward_nav_target()
+
+# --- INTERACT ---
+func _enter_interact(other: CharacterBody2D) -> void:
+	state = State.INTERACT
+	interact_timer = 5.0
+	interaction_cooldown = 5.0
+	velocity = Vector2.ZERO
+	state_changed.emit(agent_name, "interact")
+	# Request dialogue from LLM system
+	if LlmDialogue:
+		LlmDialogue.request_dialogue(self, other)
+
+func _process_interact(delta: float) -> void:
+	velocity = Vector2.ZERO
+	interact_timer -= delta
+	if interact_timer <= 0.0:
+		_enter_idle()
+
+func show_speech(text: String) -> void:
+	speech_label.text = text
+	speech_bubble.visible = true
+	speech_timer = 4.0
+
+# --- MOVING_TO_ZONE ---
+func _enter_moving_to_zone() -> void:
+	state = State.MOVING_TO_ZONE
+	# Pick a random different zone
+	var zone_names: Array = zone_rects.keys()
+	if zone_names.size() == 0:
+		_enter_wander()
+		return
+	var candidates: Array = []
+	for z in zone_names:
+		if z != current_zone:
+			candidates.append(z)
+	if candidates.size() == 0:
+		candidates = zone_names
+	var target_zone: String = candidates[randi() % candidates.size()]
+	var rect: Rect2 = zone_rects[target_zone]
+	var target_pos: Vector2 = Vector2(
+		randf_range(rect.position.x + 30, rect.end.x - 30),
+		randf_range(rect.position.y + 30, rect.end.y - 30)
+	)
+	nav_agent.target_position = target_pos
+	state_changed.emit(agent_name, "moving_to_zone")
+
+func _process_moving_to_zone(_delta: float) -> void:
+	if nav_agent.is_navigation_finished():
+		_enter_idle()
+		return
+	_move_toward_nav_target()
+
+# --- Movement helper ---
+func _move_toward_nav_target() -> void:
+	if nav_agent.is_navigation_finished():
+		velocity = Vector2.ZERO
+		return
+	var next_pos: Vector2 = nav_agent.get_next_path_position()
+	var direction: Vector2 = (next_pos - global_position).normalized()
+	velocity = direction * speed
+	move_and_slide()
+
+# --- Called by main.gd to check for nearby agents ---
+func check_nearby(other: CharacterBody2D) -> void:
+	if state == State.INTERACT or state == State.SEEK:
 		return
 	if interaction_cooldown > 0.0:
 		return
 	var dist: float = position.distance_to(other.position)
-	if dist < detection_radius:
-		_interact_with(other)
-
-func _interact_with(other: Node2D) -> void:
-	state = "interacting"
-	interaction_cooldown = 4.0
-	flash_timer = 0.6
-
-	var thought: String = Thoughts.get_thought(personality)
-	thought_label.text = thought
-	thought_label.visible = true
-	thought_timer = 2.5
-
-	queue_redraw()
-	interaction_started.emit(agent_name, other.agent_name)
-	state_changed.emit(agent_name, state)
+	if dist < 80.0 and other.interaction_cooldown <= 0.0 and other.state != State.INTERACT:
+		# Personality affects seek chance
+		var seek_chance: float = 0.3
+		match personality:
+			"social":
+				seek_chance = 0.7
+			"shy":
+				seek_chance = 0.1
+			"curious":
+				seek_chance = 0.5
+			"lazy":
+				seek_chance = 0.15
+			"wanderer":
+				seek_chance = 0.2
+		if randf() < seek_chance:
+			_enter_seek(other)
