@@ -22,6 +22,12 @@ var waypoints: Array[Dictionary] = []
 # DBG-001: Spacebar pause
 var pause_label: Label
 
+# GFX-005: Time-of-day lighting
+var sim_time: float = 8.0  # start at 8am
+const SIM_SPEED: float = 60.0  # 1 real second = 1 sim minute
+var canvas_mod: CanvasModulate
+var clock_label: Label
+
 var zone_rects: Dictionary = {
 	"park": Rect2(10, 10, 580, 380),
 	"cafe": Rect2(610, 10, 580, 380),
@@ -69,6 +75,19 @@ func _ready() -> void:
 	# DBG-001: UIPanel stays responsive while paused
 	ui_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 
+	# GFX-005: CanvasModulate for time-of-day lighting
+	canvas_mod = CanvasModulate.new()
+	canvas_mod.color = Color.WHITE
+	add_child(canvas_mod)
+	# GFX-005: Clock label in UI
+	clock_label = Label.new()
+	clock_label.add_theme_font_size_override("font_size", 14)
+	clock_label.add_theme_color_override("font_color", Color(0.8, 0.85, 1.0))
+	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	clock_label.text = "08:00"
+	ui_panel.add_child(clock_label)
+	ui_panel.move_child(clock_label, 0)  # Put clock at top of UI panel
+
 	# INT-005: Social waypoints
 	waypoints = [
 		{"name": "park bench", "position": Vector2(150, 180), "zone": "park"},
@@ -83,11 +102,30 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	_spawn_agents()
 
-# DBG-001: Spacebar pause toggle
-func _process(_delta: float) -> void:
+# DBG-001: Spacebar pause toggle + GFX-005: Time-of-day
+func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("ui_accept"):
 		get_tree().paused = not get_tree().paused
 		pause_label.visible = get_tree().paused
+	# GFX-005: Advance sim clock and update lighting
+	if not get_tree().paused:
+		sim_time = fmod(sim_time + delta * SIM_SPEED / 60.0, 24.0)
+		_update_lighting()
+		clock_label.text = "%02d:%02d" % [int(sim_time), int(fmod(sim_time * 60, 60))]
+
+# GFX-005: Time-of-day lighting
+func _update_lighting() -> void:
+	var t := sim_time
+	var col: Color
+	if t < 6.0 or t >= 22.0:    # night
+		col = Color(0.3, 0.35, 0.55)
+	elif t < 8.0 or t >= 20.0:  # dawn/dusk
+		col = Color(0.85, 0.65, 0.45)
+	elif t < 18.0:               # day
+		col = Color.WHITE
+	else:                         # evening
+		col = Color(1.0, 0.85, 0.6)
+	canvas_mod.color = canvas_mod.color.lerp(col, 0.01)  # smooth transition
 
 func _setup_zone_visuals() -> void:
 	var zone_vis := Node2D.new()
