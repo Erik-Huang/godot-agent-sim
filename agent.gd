@@ -26,6 +26,9 @@ var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
 # INT-005: Social waypoints
 var waypoints: Array = []
 
+# AUDIT-012: Centralised world bounds
+var world_bounds: Rect2 = Rect2(10, 10, 1180, 780)
+
 # Zone definitions (set by main.gd)
 var zone_rects: Dictionary = {}
 
@@ -215,8 +218,8 @@ func _pick_wander_target() -> void:
 		)
 	else:
 		target_pos = position + Vector2(randf_range(-100, 100), randf_range(-100, 100))
-		target_pos.x = clampf(target_pos.x, 30, 1170)
-		target_pos.y = clampf(target_pos.y, 30, 770)
+		target_pos.x = clampf(target_pos.x, world_bounds.position.x + 20, world_bounds.end.x - 20)
+		target_pos.y = clampf(target_pos.y, world_bounds.position.y + 20, world_bounds.end.y - 20)
 	nav_agent.target_position = target_pos
 
 func _process_wander(_delta: float) -> void:
@@ -412,8 +415,8 @@ func _enter_flee(other: CharacterBody2D) -> void:
 	# Pick a point opposite to other agent's position
 	var away_dir: Vector2 = (position - other.position).normalized()
 	var flee_target: Vector2 = position + away_dir * 120.0
-	flee_target.x = clampf(flee_target.x, 30, 1170)
-	flee_target.y = clampf(flee_target.y, 30, 770)
+	flee_target.x = clampf(flee_target.x, world_bounds.position.x + 20, world_bounds.end.x - 20)
+	flee_target.y = clampf(flee_target.y, world_bounds.position.y + 20, world_bounds.end.y - 20)
 	nav_agent.target_position = flee_target
 	interaction_cooldown = 3.0
 	state_changed.emit(agent_name, "flee")

@@ -2,6 +2,9 @@ extends Node2D
 
 const AgentScene: PackedScene = preload("res://agent.tscn")
 
+# AUDIT-012: Centralised world bounds
+const WORLD_BOUNDS := Rect2(10, 10, 1180, 780)
+
 # TODO: replace with @export var roster: Array[AgentDefinition] once .tres files created
 var agent_data: Array[Dictionary] = [
 	{"name": "Alice", "personality": "curious", "color": Color(0.3, 0.8, 1.0)},
@@ -158,6 +161,7 @@ func _spawn_agents() -> void:
 		agent.position = spawn_positions[i]
 		agent.zone_rects = zone_rects
 		agent.waypoints = waypoints  # INT-005
+		agent.world_bounds = WORLD_BOUNDS  # AUDIT-012
 		agent.interaction_started.connect(_on_agent_interaction)
 		agent.state_changed.connect(_on_agent_state_changed)
 		agent_container.add_child(agent)
