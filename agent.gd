@@ -26,6 +26,9 @@ var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
 # AUDIT-018: Direction tracking during movement
 var last_move_dir: Vector2 = Vector2.RIGHT
 
+# AUDIT-019: Sim time synced from main.gd each frame
+var sim_time: float = 8.0
+
 # INT-005: Social waypoints
 var waypoints: Array = []
 

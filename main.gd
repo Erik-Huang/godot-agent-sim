@@ -112,6 +112,9 @@ func _process(delta: float) -> void:
 		sim_time = fmod(sim_time + delta * SIM_SPEED / 60.0, 24.0)
 		_update_lighting()
 		clock_label.text = "%02d:%02d" % [int(sim_time), int(fmod(sim_time * 60, 60))]
+		# AUDIT-019: Expose sim_time to agents
+		for agent in agents:
+			agent.sim_time = sim_time
 
 # GFX-005: Time-of-day lighting
 func _update_lighting() -> void:
