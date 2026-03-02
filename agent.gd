@@ -21,6 +21,7 @@ var interact_partner: CharacterBody2D = null
 var detection_area: Area2D = null
 var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
+var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
 
 # Zone definitions (set by main.gd)
 var zone_rects: Dictionary = {}
@@ -95,6 +96,7 @@ func _ready() -> void:
 	detection_area.monitorable = true
 	add_child(detection_area)
 	detection_area.area_entered.connect(_on_area_entered)
+	detection_area.area_exited.connect(_on_area_exited)
 	self.detection_area = detection_area
 
 func get_state_name() -> String:
@@ -329,6 +331,9 @@ func _poll_nearby_agents() -> void:
 	for area in detection_area.get_overlapping_areas():
 		var other = area.get_parent()
 		if other != self and other is CharacterBody2D:
+			# AUDIT-002: Only roll once per encounter
+			if _rolled_for.has(other.agent_name):
+				continue
 			check_nearby(other)
 			if state == State.SEEK or state == State.INTERACT:
 				return
@@ -337,7 +342,16 @@ func _poll_nearby_agents() -> void:
 func _on_area_entered(area: Area2D) -> void:
 	var other = area.get_parent()
 	if other != self and other is CharacterBody2D:
+		# AUDIT-002: Only roll once per encounter
+		if _rolled_for.has(other.agent_name):
+			return
 		check_nearby(other)
+
+# AUDIT-002: Clear roll tracking when agent leaves detection zone
+func _on_area_exited(area: Area2D) -> void:
+	var other = area.get_parent()
+	if other != self and other is CharacterBody2D and other.has_method("get_state_name"):
+		_rolled_for.erase(other.agent_name)
 
 # --- Called to check for nearby agents ---
 func check_nearby(other: CharacterBody2D) -> void:
@@ -347,6 +361,8 @@ func check_nearby(other: CharacterBody2D) -> void:
 		return
 	var dist: float = position.distance_to(other.position)
 	if dist < 80.0 and other.interaction_cooldown <= 0.0 and other.state != State.INTERACT:
+		# AUDIT-002: Record that we rolled for this agent (pass or fail)
+		_rolled_for[other.agent_name] = true
 		if randf() < seek_chance:
 			# INT-006: Negative approach_tendency = flee instead of seek
 			if approach_tendency < 0.0 and randf() < absf(approach_tendency):
