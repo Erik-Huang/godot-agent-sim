@@ -213,6 +213,7 @@ func _enter_interact(other: CharacterBody2D) -> void:
 	interact_timer = 5.0
 	interaction_cooldown = 5.0
 	velocity = Vector2.ZERO
+	show_action_text("Chatting...")
 	state_changed.emit(agent_name, "interact")
 	# Request dialogue from LLM system
 	if LlmDialogue:
@@ -250,6 +251,7 @@ func _enter_moving_to_zone() -> void:
 		randf_range(rect.position.y + 30, rect.end.y - 30)
 	)
 	nav_agent.target_position = target_pos
+	show_action_text("→ %s" % target_zone)
 	state_changed.emit(agent_name, "moving_to_zone")
 
 func _process_moving_to_zone(_delta: float) -> void:
@@ -257,6 +259,21 @@ func _process_moving_to_zone(_delta: float) -> void:
 		_enter_idle()
 		return
 	_move_toward_nav_target()
+
+# --- GFX-001: Floating action text ---
+func show_action_text(text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	label.position = Vector2(-20, -45)
+	label.z_index = 10
+	add_child(label)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position:y", label.position.y - 30.0, 1.5)
+	tween.tween_property(label, "modulate:a", 0.0, 1.5)
+	tween.chain().tween_callback(label.queue_free)
 
 # --- Movement helper ---
 func _move_toward_nav_target() -> void:
