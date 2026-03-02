@@ -22,13 +22,39 @@ var zone_rects: Dictionary = {
 @onready var ui_panel: VBoxContainer = $UIPanel
 @onready var nav_region: NavigationRegion2D = $NavigationRegion2D
 
+# GFX-004: Zone color tints
+var zone_colors: Dictionary = {
+	"park": Color(0.2, 0.8, 0.2, 0.06),
+	"cafe": Color(1.0, 0.7, 0.3, 0.06),
+	"town_square": Color(0.5, 0.6, 0.8, 0.06),
+}
+
 func _ready() -> void:
 	randomize()
 	_setup_navigation()
 	_setup_wall_shapes()
+	_setup_zone_visuals()
 	# Wait one frame for navigation to bake
 	await get_tree().physics_frame
 	_spawn_agents()
+
+func _setup_zone_visuals() -> void:
+	var zone_vis := Node2D.new()
+	zone_vis.name = "ZoneVisuals"
+	# Insert before AgentContainer so tints render beneath agents
+	add_child(zone_vis)
+	move_child(zone_vis, agent_container.get_index())
+	for zone_name in zone_rects:
+		var rect: Rect2 = zone_rects[zone_name]
+		var color_rect := ColorRect.new()
+		color_rect.position = rect.position
+		color_rect.size = rect.size
+		if zone_colors.has(zone_name):
+			color_rect.color = zone_colors[zone_name]
+		else:
+			color_rect.color = Color(0.5, 0.5, 0.5, 0.06)
+		color_rect.name = "Zone_%s" % zone_name
+		zone_vis.add_child(color_rect)
 
 func _setup_navigation() -> void:
 	var nav_poly: NavigationPolygon = NavigationPolygon.new()
