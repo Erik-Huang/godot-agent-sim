@@ -12,6 +12,9 @@ var agent_data: Array[Dictionary] = [
 
 var agents: Array = []
 
+# DBG-001: Spacebar pause
+var pause_label: Label
+
 var zone_rects: Dictionary = {
 	"park": Rect2(10, 10, 580, 380),
 	"cafe": Rect2(610, 10, 580, 380),
@@ -34,9 +37,40 @@ func _ready() -> void:
 	_setup_navigation()
 	_setup_wall_shapes()
 	_setup_zone_visuals()
+	# DBG-001: Main processes during pause (for input); agents pause via their container
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	agent_container.process_mode = Node.PROCESS_MODE_PAUSABLE
+
+	# DBG-001: Create PAUSED overlay label
+	pause_label = Label.new()
+	pause_label.text = "PAUSED"
+	pause_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pause_label.add_theme_font_size_override("font_size", 48)
+	pause_label.add_theme_color_override("font_color", Color.WHITE)
+	pause_label.add_theme_constant_override("outline_size", 3)
+	pause_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	pause_label.set_anchors_preset(Control.PRESET_CENTER)
+	pause_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	pause_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	pause_label.size = Vector2(400, 60)
+	pause_label.position = Vector2(400, 370)
+	pause_label.visible = false
+	pause_label.process_mode = Node.PROCESS_MODE_ALWAYS
+	pause_label.z_index = 100
+	add_child(pause_label)
+	# DBG-001: UIPanel stays responsive while paused
+	ui_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+
 	# Wait one frame for navigation to bake
 	await get_tree().physics_frame
 	_spawn_agents()
+
+# DBG-001: Spacebar pause toggle
+func _process(_delta: float) -> void:
+	if Input.is_action_just_pressed("ui_accept"):
+		get_tree().paused = not get_tree().paused
+		pause_label.visible = get_tree().paused
 
 func _setup_zone_visuals() -> void:
 	var zone_vis := Node2D.new()
