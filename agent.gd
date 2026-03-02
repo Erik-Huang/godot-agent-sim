@@ -23,6 +23,9 @@ var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
 var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
 
+# GFX-006: AnimatedSprite2D for Ninja Adventure sprites
+var anim_sprite: AnimatedSprite2D = null
+
 # AUDIT-018: Direction tracking during movement
 var last_move_dir: Vector2 = Vector2.RIGHT
 
@@ -129,6 +132,18 @@ func _ready() -> void:
 	detection_area.area_exited.connect(_on_area_exited)
 	self.detection_area = detection_area
 
+	# GFX-006: Set up AnimatedSprite2D from generated SpriteFrames
+	anim_sprite = AnimatedSprite2D.new()
+	var frames_path: String = "res://assets/sprites/agents/%s_frames.tres" % agent_name.to_lower()
+	if ResourceLoader.exists(frames_path):
+		anim_sprite.sprite_frames = load(frames_path)
+		anim_sprite.scale = Vector2(2.0, 2.0)  # 16px → 32px apparent
+		anim_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(anim_sprite)
+		sprite.visible = false
+	else:
+		push_warning("No sprite frames found for %s at %s — using _draw() fallback" % [agent_name, frames_path])
+
 func get_state_name() -> String:
 	match state:
 		State.IDLE:
@@ -144,8 +159,9 @@ func get_state_name() -> String:
 	return "unknown"
 
 func _physics_process(delta: float) -> void:
-	# GFX-006: Redraw each frame for direction indicator
-	queue_redraw()
+	# GFX-006: Redraw each frame for direction indicator (only needed for _draw() fallback)
+	if anim_sprite == null or not anim_sprite.sprite_frames:
+		queue_redraw()
 	# Speech bubble timer
 	if speech_timer > 0.0:
 		speech_timer -= delta
@@ -187,6 +203,7 @@ func _enter_idle() -> void:
 	interact_partner = null
 	seek_target = null  # AUDIT-004: clear stale seek_target
 	state_changed.emit(agent_name, "idle")
+	_update_animation()
 
 func _process_idle(delta: float) -> void:
 	# INT-004: Generate agenda once at sim start (around 8am)
@@ -225,6 +242,7 @@ func _enter_waypoint() -> void:
 	state = State.WANDER  # reuse wander state — just a targeted walk
 	show_action_text("→ %s" % wp["name"])
 	state_changed.emit(agent_name, "wander")
+	_update_animation()
 
 # --- WANDER ---
 func _enter_wander() -> void:
@@ -232,6 +250,7 @@ func _enter_wander() -> void:
 	seek_target = null  # AUDIT-004: clear stale seek_target
 	_pick_wander_target()
 	state_changed.emit(agent_name, "wander")
+	_update_animation()
 
 func _pick_wander_target() -> void:
 	# Pick a random point within current zone (or nearby)
@@ -261,6 +280,7 @@ func _enter_seek(target: CharacterBody2D) -> void:
 	seek_target = target
 	nav_agent.target_position = target.position
 	state_changed.emit(agent_name, "seek")
+	_update_animation()
 
 func _process_seek(_delta: float) -> void:
 	if seek_target == null or not is_instance_valid(seek_target):
@@ -285,6 +305,7 @@ func _enter_interact(other: CharacterBody2D) -> void:
 	interact_partner = other
 	show_action_text("Chatting...")
 	state_changed.emit(agent_name, "interact")
+	_update_animation()
 	# AUDIT-001: Notify partner so both agents enter INTERACT state
 	if other.has_method("receive_interaction"):
 		other.receive_interaction(self)
@@ -302,6 +323,7 @@ func receive_interaction(initiator: CharacterBody2D) -> void:
 	velocity = Vector2.ZERO
 	state = State.INTERACT
 	state_changed.emit(agent_name, "interact")
+	_update_animation()
 
 func _process_interact(delta: float) -> void:
 	velocity = Vector2.ZERO
@@ -311,6 +333,7 @@ func _process_interact(delta: float) -> void:
 		var face_dir: Vector2 = (interact_partner.global_position - global_position).normalized()
 		if face_dir.length() > 0.01:
 			last_move_dir = face_dir  # GFX-006: Update direction indicator to face partner
+			_update_animation()
 	if interact_timer <= 0.0:
 		_enter_idle()
 
@@ -351,6 +374,7 @@ func _enter_moving_to_zone() -> void:
 	nav_agent.target_position = target_pos
 	show_action_text("→ %s" % target_zone)
 	state_changed.emit(agent_name, "moving_to_zone")
+	_update_animation()
 
 func _process_moving_to_zone(_delta: float) -> void:
 	# AUDIT-014: Allow interactions while traveling between zones
@@ -436,9 +460,42 @@ func _follow_agenda_item(item: Dictionary) -> void:
 	show_action_text("→ %s" % item["activity"])
 	state = State.MOVING_TO_ZONE
 	state_changed.emit(agent_name, "moving_to_zone")
+	_update_animation()
 
-# --- GFX-006: Direction-aware procedural sprites ---
+# --- GFX-006: Animation helpers ---
+func _dir_to_suffix() -> String:
+	var d := last_move_dir
+	if abs(d.x) > abs(d.y):
+		return "right" if d.x > 0 else "left"
+	else:
+		return "down" if d.y > 0 else "up"
+
+func _update_animation() -> void:
+	if anim_sprite == null or not anim_sprite.sprite_frames:
+		queue_redraw()  # fall back to _draw() circle
+		return
+	
+	var dir_suffix: String = _dir_to_suffix()
+	
+	match state:
+		State.IDLE:
+			anim_sprite.play("idle_" + dir_suffix)
+		State.WANDER, State.MOVING_TO_ZONE:
+			anim_sprite.play("walk_" + dir_suffix)
+		State.SEEK:
+			anim_sprite.play("walk_" + dir_suffix)
+		State.INTERACT:
+			anim_sprite.play("idle_" + dir_suffix)
+
+# --- GFX-006: Direction-aware procedural sprites (fallback) ---
 func _draw() -> void:
+	# Skip if AnimatedSprite2D is handling visuals
+	if anim_sprite != null and anim_sprite.sprite_frames != null:
+		# Still draw the interact line if needed
+		if state == State.INTERACT and interact_partner and is_instance_valid(interact_partner):
+			var target_local: Vector2 = interact_partner.global_position - global_position
+			draw_line(Vector2.ZERO, target_local, Color(1.0, 1.0, 1.0, 0.4), 1.5)
+		return
 	# Body circle
 	draw_circle(Vector2.ZERO, 10.0, agent_color)
 	# Direction indicator (nose)
@@ -479,8 +536,12 @@ func _move_toward_nav_target() -> void:
 	var direction: Vector2 = (next_pos - global_position).normalized()
 	# AUDIT-018: Store direction and flip sprite while walking
 	if direction.length() > 0.1:
+		var old_suffix: String = _dir_to_suffix()
 		last_move_dir = direction
 		sprite.flip_h = direction.x < 0.0
+		# GFX-006: Update walk animation when direction changes
+		if _dir_to_suffix() != old_suffix:
+			_update_animation()
 	velocity = direction * speed
 	move_and_slide()
 
@@ -546,3 +607,4 @@ func _enter_flee(other: CharacterBody2D) -> void:
 	nav_agent.target_position = flee_target
 	interaction_cooldown = 3.0
 	state_changed.emit(agent_name, "flee")
+	_update_animation()
