@@ -17,6 +17,8 @@ var interaction_cooldown: float = 0.0
 var seek_target: CharacterBody2D = null
 var speech_timer: float = 0.0
 var current_zone: String = ""
+var seek_chance: float = 0.3
+var approach_tendency: float = 0.0
 
 # Zone definitions (set by main.gd)
 var zone_rects: Dictionary = {}
@@ -55,6 +57,27 @@ func _ready() -> void:
 			speed = 60.0
 		"social":
 			speed = 65.0
+
+	# INT-006: Personality-driven approach/flee tendencies
+	match personality:
+		"social":
+			seek_chance = 0.7
+			approach_tendency = 0.8
+		"shy":
+			seek_chance = 0.1
+			approach_tendency = -0.5
+		"curious":
+			seek_chance = 0.5
+			approach_tendency = 0.2
+		"wanderer":
+			seek_chance = 0.2
+			approach_tendency = 0.0
+		"lazy":
+			seek_chance = 0.15
+			approach_tendency = -0.1
+		_:
+			seek_chance = 0.3
+			approach_tendency = 0.0
 
 	# Start in IDLE
 	_enter_idle()
@@ -259,18 +282,21 @@ func check_nearby(other: CharacterBody2D) -> void:
 		return
 	var dist: float = position.distance_to(other.position)
 	if dist < 80.0 and other.interaction_cooldown <= 0.0 and other.state != State.INTERACT:
-		# Personality affects seek chance
-		var seek_chance: float = 0.3
-		match personality:
-			"social":
-				seek_chance = 0.7
-			"shy":
-				seek_chance = 0.1
-			"curious":
-				seek_chance = 0.5
-			"lazy":
-				seek_chance = 0.15
-			"wanderer":
-				seek_chance = 0.2
 		if randf() < seek_chance:
-			_enter_seek(other)
+			# INT-006: Negative approach_tendency = flee instead of seek
+			if approach_tendency < 0.0 and randf() < absf(approach_tendency):
+				_enter_flee(other)
+			else:
+				_enter_seek(other)
+
+# --- FLEE (INT-006: personality-driven avoidance) ---
+func _enter_flee(other: CharacterBody2D) -> void:
+	state = State.WANDER
+	# Pick a point opposite to other agent's position
+	var away_dir: Vector2 = (position - other.position).normalized()
+	var flee_target: Vector2 = position + away_dir * 120.0
+	flee_target.x = clampf(flee_target.x, 30, 1170)
+	flee_target.y = clampf(flee_target.y, 30, 770)
+	nav_agent.target_position = flee_target
+	interaction_cooldown = 3.0
+	state_changed.emit(agent_name, "flee")
