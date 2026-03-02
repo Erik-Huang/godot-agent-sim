@@ -71,7 +71,10 @@ func _async_rate_importance(agent_name: String, text: String, api_key: String) -
 
 	var body: Dictionary = {
 		"model": "gpt-4o-mini",
-		"messages": [{"role": "user", "content": prompt_text}],
+		"messages": [
+			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+			{"role": "user", "content": prompt_text}
+		],
 		"max_tokens": 5,
 		"temperature": 0.0,
 	}
@@ -155,7 +158,10 @@ func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_
 
 	var body: Dictionary = {
 		"model": "gpt-4o-mini",
-		"messages": [{"role": "user", "content": prompt_text}],
+		"messages": [
+			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+			{"role": "user", "content": prompt_text}
+		],
 		"max_tokens": 50,
 		"temperature": 0.8,
 	}
