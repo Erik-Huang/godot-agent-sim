@@ -98,6 +98,9 @@ func _ready() -> void:
 		{"name": "square bench", "position": Vector2(700, 650), "zone": "town_square"},
 	]
 
+	# MEM-005: Connect reflection signal to LLM reflection handler
+	MemoryService.on_reflection_ready.connect(_on_reflection_ready)
+
 	# Wait one frame for navigation to bake
 	await get_tree().physics_frame
 	_spawn_agents()
@@ -213,6 +216,10 @@ func _spawn_agents() -> void:
 
 # INT-001: Proximity detection moved to Area2D signals on each agent
 # The O(n²) loop is no longer needed here
+
+# MEM-005: Trigger LLM reflection when an agent hits the observation threshold
+func _on_reflection_ready(agent_name: String) -> void:
+	LlmDialogue.request_reflection(agent_name)
 
 func _on_agent_interaction(agent_name: String, other_name: String, dialogue: String) -> void:
 	ui_panel.log_interaction(agent_name, other_name, dialogue)

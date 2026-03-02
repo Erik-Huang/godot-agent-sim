@@ -8,6 +8,11 @@ var observations: Dictionary = {}
 # Structure: {agent_name: {other_name: {count: int, last_seen: float, sentiment: float}}}
 var relationships: Dictionary = {}
 
+# MEM-005: Reflection synthesis — tracks observations since last reflection per agent
+var reflection_counters: Dictionary = {}
+const REFLECTION_THRESHOLD: int = 15
+signal on_reflection_ready(agent_name: String)
+
 const MAX_OBSERVATIONS_PER_AGENT: int = 200
 const MEMORY_DIR: String = "user://memory/"
 
@@ -40,6 +45,14 @@ func add_observation(agent_name: String, text: String, importance: int = 5, tags
 		"tags": tags,
 	}
 	observations[agent_name].append(entry)
+
+	# MEM-005: Track observations for reflection synthesis
+	if not reflection_counters.has(agent_name):
+		reflection_counters[agent_name] = 0
+	reflection_counters[agent_name] += 1
+	if reflection_counters[agent_name] >= REFLECTION_THRESHOLD:
+		on_reflection_ready.emit(agent_name)
+		reflection_counters[agent_name] = 0
 
 	# Evict lowest-score entry if over cap
 	if observations[agent_name].size() > MAX_OBSERVATIONS_PER_AGENT:
@@ -81,6 +94,14 @@ func get_sentiment(agent_name: String, other_name: String) -> float:
 		return relationships[agent_name][other_name]["sentiment"]
 	return 0.0
 
+# MEM-005: Get most recent N observations for reflection context
+func get_observations_for_reflection(agent_name: String, n: int = 10) -> Array:
+	if not observations.has(agent_name):
+		return []
+	var obs_list: Array = observations[agent_name]
+	var start_idx: int = maxi(0, obs_list.size() - n)
+	return obs_list.slice(start_idx)
+
 func save_memories() -> void:
 	DirAccess.make_dir_recursive_absolute(MEMORY_DIR)
 	for agent_name in observations:
@@ -88,6 +109,8 @@ func save_memories() -> void:
 		var save_data: Dictionary = {"observations": observations[agent_name]}
 		if relationships.has(agent_name):
 			save_data["relationships"] = relationships[agent_name]
+		if reflection_counters.has(agent_name):
+			save_data["reflection_counter"] = reflection_counters[agent_name]
 		var file := FileAccess.open(path, FileAccess.WRITE)
 		if file:
 			file.store_string(JSON.stringify(save_data, "\t"))
@@ -118,6 +141,8 @@ func load_memories() -> void:
 						observations[agent_name] = json.data.get("observations", [])
 						if json.data.has("relationships"):
 							relationships[agent_name] = json.data["relationships"]
+						if json.data.has("reflection_counter"):
+							reflection_counters[agent_name] = json.data["reflection_counter"]
 				file.close()
 		file_name = dir.get_next()
 	dir.list_dir_end()

@@ -330,3 +330,66 @@ func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D
 	if err != OK:
 		_dispatch_next()
 		http.queue_free()
+
+
+# MEM-005: Reflection synthesis — LLM generates insight from recent observations
+func request_reflection(agent_name: String) -> void:
+	var api_key: String = OS.get_environment("OPENAI_API_KEY")
+	if api_key == "":
+		return  # Reflections are non-critical; silently skip without API
+
+	var recent_obs: Array = MemoryService.get_observations_for_reflection(agent_name, 10)
+	if recent_obs.size() == 0:
+		return
+
+	_dispatch_or_queue(func() -> void:
+		_do_reflection_request(agent_name, recent_obs, api_key)
+	)
+
+func _do_reflection_request(agent_name: String, recent_obs: Array, api_key: String) -> void:
+	var http: HTTPRequest = HTTPRequest.new()
+	add_child(http)
+
+	var formatted_obs: String = ""
+	for obs in recent_obs:
+		formatted_obs += "- %s\n" % obs["text"]
+
+	var prompt_text: String = "Here are recent observations by %s:\n%s\nWrite 1-2 sentences of personal insight %s would draw from these. Be introspective and specific.\nReply with ONLY the insight sentences." % [
+		agent_name, formatted_obs, agent_name
+	]
+
+	var body: Dictionary = {
+		"model": "gpt-4o-mini",
+		"messages": [
+			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+			{"role": "user", "content": prompt_text}
+		],
+		"max_tokens": 80,
+		"temperature": 0.7,
+	}
+
+	var headers: PackedStringArray = PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Bearer %s" % api_key,
+	])
+
+	var json_body: String = JSON.stringify(body)
+
+	http.request_completed.connect(
+		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
+			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
+				var json := JSON.new()
+				if json.parse(body_bytes.get_string_from_utf8()) == OK:
+					var data: Dictionary = json.data
+					if data.has("choices") and data["choices"].size() > 0:
+						var insight_text: String = data["choices"][0]["message"]["content"].strip_edges()
+						if insight_text.length() > 0 and MemoryService:
+							MemoryService.add_observation(agent_name, insight_text, 8, ["reflection"])
+			_dispatch_next()
+			http.queue_free()
+	)
+
+	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
+	if err != OK:
+		_dispatch_next()
+		http.queue_free()
