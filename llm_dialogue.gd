@@ -258,10 +258,11 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 
 
 # AUDIT-003: Generate a response for the interaction partner
+# AUDIT-017: HTTP dispatch routed through _dispatch_or_queue() for rate limiting
 func _generate_partner_response(agent: CharacterBody2D, other: CharacterBody2D, initiator_text: String) -> void:
 	if not is_instance_valid(other):
 		return
-	# Show fallback reaction immediately after a 1.5s delay
+	# Show fallback reaction immediately after a 1.5s delay (UI only, not queued)
 	var fallback: String = _get_fallback(other.personality)
 	var tree: SceneTree = get_tree()
 	if tree == null:
@@ -271,9 +272,19 @@ func _generate_partner_response(agent: CharacterBody2D, other: CharacterBody2D, 
 		return
 	other.show_speech(fallback)
 
-	# If API key present, make a short LLM call to replace fallback
+	# If API key present, queue the LLM call through the rate limiter
 	var api_key: String = OS.get_environment("OPENAI_API_KEY")
 	if api_key == "":
+		return
+
+	_dispatch_or_queue(func() -> void:
+		_do_partner_response_request(agent, other, initiator_text, api_key)
+	)
+
+# AUDIT-017: Extracted HTTP dispatch for partner response (called via queue)
+func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D, initiator_text: String, api_key: String) -> void:
+	if not is_instance_valid(other):
+		_dispatch_next()
 		return
 
 	var http: HTTPRequest = HTTPRequest.new()
@@ -311,9 +322,11 @@ func _generate_partner_response(agent: CharacterBody2D, other: CharacterBody2D, 
 						var reply_text: String = data["choices"][0]["message"]["content"].strip_edges()
 						if is_instance_valid(other):
 							other.show_speech(reply_text)
+			_dispatch_next()
 			http.queue_free()
 	)
 
 	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
 	if err != OK:
+		_dispatch_next()
 		http.queue_free()
