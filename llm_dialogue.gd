@@ -237,6 +237,9 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 			var obs_text: String = "I talked to %s near the %s. They said: '%s'" % [other.agent_name, zone_name, text]
 			MemoryService.add_observation(agent.agent_name, obs_text, 6, ["social", "interaction"])
 			MemoryService.add_observation(other.agent_name, "I was approached by %s in the %s" % [agent.agent_name, zone_name], 5, ["social"])
+			# MEM-004: Update social relationships (both directions)
+			MemoryService.update_relationship(agent.agent_name, other.agent_name, 0.1)
+			MemoryService.update_relationship(other.agent_name, agent.agent_name, 0.1)
 	else:
 		var fallback: String = _get_fallback(agent.personality)
 		agent.show_speech(fallback)

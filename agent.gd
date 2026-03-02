@@ -376,7 +376,10 @@ func check_nearby(other: CharacterBody2D) -> void:
 	if dist < 80.0 and other.interaction_cooldown <= 0.0 and other.state != State.INTERACT:
 		# AUDIT-002: Record that we rolled for this agent (pass or fail)
 		_rolled_for[other.agent_name] = true
-		if randf() < seek_chance:
+		# MEM-004: Adjust seek chance by social sentiment
+		var sentiment: float = MemoryService.get_sentiment(agent_name, other.agent_name)
+		var adjusted_chance: float = seek_chance * (1.0 + sentiment * 0.5)
+		if randf() < adjusted_chance:
 			# INT-006: Negative approach_tendency = flee instead of seek
 			if approach_tendency < 0.0 and randf() < absf(approach_tendency):
 				_enter_flee(other)

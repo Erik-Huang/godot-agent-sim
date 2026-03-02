@@ -4,6 +4,10 @@ extends Node
 # observations[agent_name] = Array of {text: String, timestamp_sec: float, importance: int, tags: Array[String]}
 var observations: Dictionary = {}
 
+# MEM-004: Social relationship tracking
+# Structure: {agent_name: {other_name: {count: int, last_seen: float, sentiment: float}}}
+var relationships: Dictionary = {}
+
 const MAX_OBSERVATIONS_PER_AGENT: int = 200
 const MEMORY_DIR: String = "user://memory/"
 
@@ -60,13 +64,33 @@ func get_top_memories(agent_name: String, n: int = 5) -> Array:
 		result.append(scored[i]["obs"])
 	return result
 
+# MEM-004: Update relationship between two agents
+func update_relationship(agent_name: String, other_name: String, sentiment_delta: float) -> void:
+	if not relationships.has(agent_name):
+		relationships[agent_name] = {}
+	if not relationships[agent_name].has(other_name):
+		relationships[agent_name][other_name] = {"count": 0, "last_seen": 0.0, "sentiment": 0.0}
+	var rel: Dictionary = relationships[agent_name][other_name]
+	rel["count"] += 1
+	rel["last_seen"] = Time.get_unix_time_from_system()
+	rel["sentiment"] = clampf(rel["sentiment"] + sentiment_delta, -1.0, 1.0)
+
+# MEM-004: Get sentiment toward another agent (0.0 if unknown)
+func get_sentiment(agent_name: String, other_name: String) -> float:
+	if relationships.has(agent_name) and relationships[agent_name].has(other_name):
+		return relationships[agent_name][other_name]["sentiment"]
+	return 0.0
+
 func save_memories() -> void:
 	DirAccess.make_dir_recursive_absolute(MEMORY_DIR)
 	for agent_name in observations:
 		var path: String = MEMORY_DIR + agent_name + ".json"
+		var save_data: Dictionary = {"observations": observations[agent_name]}
+		if relationships.has(agent_name):
+			save_data["relationships"] = relationships[agent_name]
 		var file := FileAccess.open(path, FileAccess.WRITE)
 		if file:
-			file.store_string(JSON.stringify(observations[agent_name], "\t"))
+			file.store_string(JSON.stringify(save_data, "\t"))
 			file.close()
 
 func load_memories() -> void:
@@ -85,8 +109,15 @@ func load_memories() -> void:
 			if file:
 				var json := JSON.new()
 				var err: int = json.parse(file.get_as_text())
-				if err == OK and json.data is Array:
-					observations[agent_name] = json.data
+				if err == OK:
+					if json.data is Array:
+						# Legacy format: bare array of observations
+						observations[agent_name] = json.data
+					elif json.data is Dictionary:
+						# MEM-004: New format with relationships
+						observations[agent_name] = json.data.get("observations", [])
+						if json.data.has("relationships"):
+							relationships[agent_name] = json.data["relationships"]
 				file.close()
 		file_name = dir.get_next()
 	dir.list_dir_end()
