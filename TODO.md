@@ -51,3 +51,7 @@ All shipped. Key wins:
 
 - **ContentData autoload order**: must be first in `project.godot` autoload list — `class_name` resolution not guaranteed at parse time
 - **area_entered one-shot**: signal fires once on entry; poll `get_overlapping_areas()` in idle/wander to retry missed rolls
+
+### Debug
+- **DBG-001** — Spacebar pause: `Input.is_action_just_pressed("ui_accept")` in `main.gd._process()`; toggle `get_tree().paused`; show "PAUSED" overlay label centred on screen. Add `pause_mode = PAUSE_MODE_PROCESS` to UI so overlay stays visible. *Effort: Low | Impact: Medium*
+- **DBG-002** — Readable text: all in-world labels are too small and dark on the grey background. Set name labels → size 14, white (`Color.WHITE`); speech bubble text → size 13, white; floating action text → size 12, white; UI side panel → size 13, light grey `Color(0.9, 0.9, 0.95)`. *Effort: Trivial | Impact: High*
