@@ -10,12 +10,20 @@ config/features=PackedStringArray("4.2")
 
 [autoload]
 
+ContentData="*res://content_data.gd"
+
+MemoryService="*res://memory_service.gd"
 Thoughts="*res://thoughts.gd"
+LlmDialogue="*res://llm_dialogue.gd"
 
 [display]
 
-window/size/viewport_width=1000
-window/size/viewport_height=600
+window/size/viewport_width=1450
+window/size/viewport_height=800
+
+[navigation]
+
+2d/default_cell_size=1.0
 
 [rendering]
 
