@@ -9,6 +9,17 @@ const MEMORY_DIR: String = "user://memory/"
 
 func _ready() -> void:
 	load_memories()
+	# AUDIT-005: Auto-save timer to prevent memory loss on editor stop / crash
+	var auto_save_timer := Timer.new()
+	auto_save_timer.name = "AutoSaveTimer"
+	auto_save_timer.wait_time = 60.0
+	auto_save_timer.autostart = true
+	add_child(auto_save_timer)
+	auto_save_timer.timeout.connect(save_memories)
+
+# AUDIT-005: Save on tree exit (editor stop, scene change, etc.)
+func _exit_tree() -> void:
+	save_memories()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
