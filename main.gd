@@ -2,6 +2,7 @@ extends Node2D
 
 const AgentScene: PackedScene = preload("res://agent.tscn")
 
+# TODO: replace with @export var roster: Array[AgentDefinition] once .tres files created
 var agent_data: Array[Dictionary] = [
 	{"name": "Alice", "personality": "curious", "color": Color(0.3, 0.8, 1.0)},
 	{"name": "Bob", "personality": "shy", "color": Color(0.6, 0.4, 0.9)},
