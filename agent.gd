@@ -153,6 +153,7 @@ func _enter_idle() -> void:
 	idle_timer = randf_range(2.0, 3.0)
 	velocity = Vector2.ZERO
 	interact_partner = null
+	seek_target = null  # AUDIT-004: clear stale seek_target
 	queue_redraw()
 	state_changed.emit(agent_name, "idle")
 
@@ -173,6 +174,7 @@ func _process_idle(delta: float) -> void:
 # --- WANDER ---
 func _enter_wander() -> void:
 	state = State.WANDER
+	seek_target = null  # AUDIT-004: clear stale seek_target
 	_pick_wander_target()
 	state_changed.emit(agent_name, "wander")
 
