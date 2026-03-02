@@ -10,6 +10,7 @@ config/features=PackedStringArray("4.2")
 
 [autoload]
 
+MemoryService="*res://memory_service.gd"
 Thoughts="*res://thoughts.gd"
 LlmDialogue="*res://llm_dialogue.gd"
 
