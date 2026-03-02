@@ -17,6 +17,7 @@ var interaction_cooldown: float = 0.0
 var seek_target: CharacterBody2D = null
 var speech_timer: float = 0.0
 var current_zone: String = ""
+var interact_partner: CharacterBody2D = null
 var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
 
@@ -147,6 +148,8 @@ func _enter_idle() -> void:
 	state = State.IDLE
 	idle_timer = randf_range(2.0, 3.0)
 	velocity = Vector2.ZERO
+	interact_partner = null
+	queue_redraw()
 	state_changed.emit(agent_name, "idle")
 
 func _process_idle(delta: float) -> void:
@@ -213,6 +216,7 @@ func _enter_interact(other: CharacterBody2D) -> void:
 	interact_timer = 5.0
 	interaction_cooldown = 5.0
 	velocity = Vector2.ZERO
+	interact_partner = other
 	show_action_text("Chatting...")
 	state_changed.emit(agent_name, "interact")
 	# Request dialogue from LLM system
@@ -222,6 +226,9 @@ func _enter_interact(other: CharacterBody2D) -> void:
 func _process_interact(delta: float) -> void:
 	velocity = Vector2.ZERO
 	interact_timer -= delta
+	# GFX-002: Redraw interaction line each frame
+	if interact_partner and is_instance_valid(interact_partner):
+		queue_redraw()
 	if interact_timer <= 0.0:
 		_enter_idle()
 
@@ -259,6 +266,12 @@ func _process_moving_to_zone(_delta: float) -> void:
 		_enter_idle()
 		return
 	_move_toward_nav_target()
+
+# --- GFX-002: Interaction indicator ---
+func _draw() -> void:
+	if state == State.INTERACT and interact_partner and is_instance_valid(interact_partner):
+		var target_local: Vector2 = interact_partner.global_position - global_position
+		draw_line(Vector2.ZERO, target_local, Color(1.0, 1.0, 1.0, 0.4), 1.5)
 
 # --- GFX-001: Floating action text ---
 func show_action_text(text: String) -> void:
