@@ -23,6 +23,9 @@ var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
 var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
 
+# AUDIT-018: Direction tracking during movement
+var last_move_dir: Vector2 = Vector2.RIGHT
+
 # INT-005: Social waypoints
 var waypoints: Array = []
 
@@ -366,6 +369,10 @@ func _move_toward_nav_target() -> void:
 		return
 	var next_pos: Vector2 = nav_agent.get_next_path_position()
 	var direction: Vector2 = (next_pos - global_position).normalized()
+	# AUDIT-018: Store direction and flip sprite while walking
+	if direction.length() > 0.1:
+		last_move_dir = direction
+		sprite.flip_h = direction.x < 0.0
 	velocity = direction * speed
 	move_and_slide()
 
