@@ -91,6 +91,18 @@ func _async_rate_importance(agent_name: String, text: String, api_key: String) -
 	if err != OK:
 		http.queue_free()
 
+# MEM-003: Format top memories as a text block for prompt injection
+func _format_memories_block(agent_name: String, n: int = 3) -> String:
+	if not MemoryService:
+		return ""
+	var memories: Array = MemoryService.get_top_memories(agent_name, n)
+	if memories.size() == 0:
+		return ""
+	var lines: String = "Recent memories:\n"
+	for mem in memories:
+		lines += "- %s\n" % mem["text"]
+	return lines
+
 func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 	var cache_key: String = _get_cache_key(agent.agent_name, other.agent_name)
 
@@ -115,8 +127,10 @@ func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 	var http: HTTPRequest = HTTPRequest.new()
 	add_child(http)
 
-	var prompt_text: String = "You are %s, a %s person. You just met %s, who is %s. Write ONE short sentence (max 12 words) you'd say to them. Reply with ONLY the sentence." % [
-		agent.agent_name, agent.personality, other.agent_name, other.personality
+	# MEM-003 + INT-002: Richer prompt with memory context
+	var memories_block: String = _format_memories_block(agent.agent_name, 3)
+	var prompt_text: String = "You are %s, a %s person currently in the %s area.\n%sYou just encountered %s, who is %s.\nWrite ONE sentence (max 12 words) you would say to them. Reply with ONLY the sentence." % [
+		agent.agent_name, agent.personality, agent.current_zone, memories_block, other.agent_name, other.personality
 	]
 
 	var body: Dictionary = {
