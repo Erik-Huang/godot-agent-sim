@@ -16,6 +16,17 @@ All shipped. Key wins:
 
 ---
 
+## ✅ Phase 2 — Complete
+
+All shipped. Key wins:
+- **Debug**: spacebar pause + PAUSED overlay; all labels white, sized, outlined
+- **Memory depth**: social relationship sentiment, exponential recency decay
+- **Behavior**: 6 named social waypoints, interactions during travel
+- **Visual**: time-of-day lighting (60x sim speed, dawn/dusk/night), upgraded thought bubble with last-memory line
+- **Architecture**: AgentDefinition + PersonalityProfile resource stubs, centralised world bounds, dynamic agent names, UI label pool
+
+---
+
 ## Phase 2 — Next Up
 
 ### Memory
