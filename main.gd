@@ -12,6 +12,9 @@ var agent_data: Array[Dictionary] = [
 
 var agents: Array = []
 
+# INT-005: Social waypoints — named hotspots for encounter density
+var waypoints: Array[Dictionary] = []
+
 # DBG-001: Spacebar pause
 var pause_label: Label
 
@@ -61,6 +64,16 @@ func _ready() -> void:
 	add_child(pause_label)
 	# DBG-001: UIPanel stays responsive while paused
 	ui_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# INT-005: Social waypoints
+	waypoints = [
+		{"name": "park bench", "position": Vector2(150, 180), "zone": "park"},
+		{"name": "park fountain", "position": Vector2(350, 250), "zone": "park"},
+		{"name": "cafe counter", "position": Vector2(750, 120), "zone": "cafe"},
+		{"name": "cafe window", "position": Vector2(950, 280), "zone": "cafe"},
+		{"name": "square stage", "position": Vector2(400, 580), "zone": "town_square"},
+		{"name": "square bench", "position": Vector2(700, 650), "zone": "town_square"},
+	]
 
 	# Wait one frame for navigation to bake
 	await get_tree().physics_frame
@@ -143,6 +156,7 @@ func _spawn_agents() -> void:
 		agent.agent_color = data["color"]
 		agent.position = spawn_positions[i]
 		agent.zone_rects = zone_rects
+		agent.waypoints = waypoints  # INT-005
 		agent.interaction_started.connect(_on_agent_interaction)
 		agent.state_changed.connect(_on_agent_state_changed)
 		agent_container.add_child(agent)

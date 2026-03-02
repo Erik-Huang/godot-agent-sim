@@ -23,6 +23,9 @@ var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
 var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
 
+# INT-005: Social waypoints
+var waypoints: Array = []
+
 # Zone definitions (set by main.gd)
 var zone_rects: Dictionary = {}
 
@@ -176,8 +179,22 @@ func _process_idle(delta: float) -> void:
 		var roll: float = randf()
 		if roll < 0.15:
 			_enter_moving_to_zone()
+		elif roll < 0.35:
+			# INT-005: 20% chance to path toward a social waypoint
+			_enter_waypoint()
 		else:
 			_enter_wander()
+
+# --- INT-005: WAYPOINT ---
+func _enter_waypoint() -> void:
+	if waypoints.is_empty():
+		_enter_wander()
+		return
+	var wp: Dictionary = waypoints[randi() % waypoints.size()]
+	nav_agent.target_position = wp["position"]
+	state = State.WANDER  # reuse wander state — just a targeted walk
+	show_action_text("→ %s" % wp["name"])
+	state_changed.emit(agent_name, "wander")
 
 # --- WANDER ---
 func _enter_wander() -> void:
