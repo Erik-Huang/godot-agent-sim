@@ -131,6 +131,9 @@ func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 			agent.show_speech(cached["text"])
 			agent.interaction_started.emit(agent.agent_name, other.agent_name, cached["text"])
 			return
+		else:
+			# AUDIT-006: Remove stale cache entries instead of letting them accumulate
+			dialogue_cache.erase(cache_key)
 
 	# Try API call
 	var api_key: String = OS.get_environment("OPENAI_API_KEY")
