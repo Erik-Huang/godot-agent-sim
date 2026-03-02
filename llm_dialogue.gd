@@ -393,3 +393,72 @@ func _do_reflection_request(agent_name: String, recent_obs: Array, api_key: Stri
 	if err != OK:
 		_dispatch_next()
 		http.queue_free()
+
+# INT-004: Daily agenda generation via LLM
+func request_agenda(agent_name: String, personality: String, backstory: String, callback: Callable) -> void:
+	var api_key: String = OS.get_environment("OPENAI_API_KEY")
+	if api_key == "":
+		callback.call([])
+		return
+
+	_dispatch_or_queue(func() -> void:
+		_do_agenda_request(agent_name, personality, backstory, api_key, callback)
+	)
+
+func _do_agenda_request(agent_name: String, personality: String, backstory: String, api_key: String, callback: Callable) -> void:
+	var http: HTTPRequest = HTTPRequest.new()
+	add_child(http)
+
+	var backstory_line: String = " %s" % backstory if backstory != "" else ""
+	var prompt_text: String = "You are %s, a %s person.%s\nIt's morning in a small town with a park, cafe, and town square.\nWrite a simple daily plan: 3-4 short activities with locations.\nFormat EXACTLY as: activity|zone (one per line, zone must be: park, cafe, or town_square)\nExample:\nmorning coffee|cafe\nread in the park|park\nchat with friends|town_square" % [
+		agent_name, personality, backstory_line
+	]
+
+	var body: Dictionary = {
+		"model": "gpt-4o-mini",
+		"messages": [
+			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+			{"role": "user", "content": prompt_text}
+		],
+		"max_tokens": 80,
+		"temperature": 0.8,
+	}
+
+	var headers: PackedStringArray = PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Bearer %s" % api_key,
+	])
+
+	var json_body: String = JSON.stringify(body)
+	var valid_zones: Array = ["park", "cafe", "town_square"]
+
+	http.request_completed.connect(
+		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
+			var items: Array = []
+			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
+				var json := JSON.new()
+				if json.parse(body_bytes.get_string_from_utf8()) == OK:
+					var data: Dictionary = json.data
+					if data.has("choices") and data["choices"].size() > 0:
+						var response_text: String = data["choices"][0]["message"]["content"].strip_edges()
+						var lines: PackedStringArray = response_text.split("\n")
+						for line in lines:
+							var stripped: String = line.strip_edges()
+							if stripped == "":
+								continue
+							var parts: PackedStringArray = stripped.split("|")
+							if parts.size() == 2:
+								var activity: String = parts[0].strip_edges()
+								var zone: String = parts[1].strip_edges()
+								if zone in valid_zones and activity.length() > 0:
+									items.append({"activity": activity, "zone": zone, "done": false})
+			callback.call(items)
+			_dispatch_next()
+			http.queue_free()
+	)
+
+	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
+	if err != OK:
+		callback.call([])
+		_dispatch_next()
+		http.queue_free()

@@ -29,6 +29,11 @@ var last_move_dir: Vector2 = Vector2.RIGHT
 # AUDIT-019: Sim time synced from main.gd each frame
 var sim_time: float = 8.0
 
+# INT-004: Daily agenda
+var agenda: Array = []  # [{activity: String, zone: String, done: bool}]
+var agenda_generated: bool = false
+var backstory: String = ""  # Set by main.gd for LLM agenda generation
+
 # INT-005: Social waypoints
 var waypoints: Array = []
 
@@ -181,6 +186,16 @@ func _enter_idle() -> void:
 	state_changed.emit(agent_name, "idle")
 
 func _process_idle(delta: float) -> void:
+	# INT-004: Generate agenda once at sim start (around 8am)
+	if not agenda_generated and sim_time >= 8.0:
+		_request_agenda()
+		agenda_generated = true
+	# INT-004: Follow agenda if idle long enough
+	if idle_timer < 0.5 and agenda.size() > 0:
+		var next_item: Dictionary = _get_next_agenda_item()
+		if not next_item.is_empty():
+			_follow_agenda_item(next_item)
+			return
 	_poll_nearby_agents()
 	idle_timer -= delta
 	# AUDIT-010: Occasionally surface an idle thought via Thoughts autoload
@@ -340,9 +355,86 @@ func _process_moving_to_zone(_delta: float) -> void:
 	# AUDIT-014: Allow interactions while traveling between zones
 	_poll_nearby_agents()
 	if nav_agent.is_navigation_finished():
+		# INT-004: Mark current agenda item done on arrival
+		for item in agenda:
+			if not item["done"]:
+				item["done"] = true
+				break
 		_enter_idle()
 		return
 	_move_toward_nav_target()
+
+# --- INT-004: Daily agenda helpers ---
+func _request_agenda() -> void:
+	var api_key: String = OS.get_environment("OPENAI_API_KEY")
+	if api_key != "" and LlmDialogue:
+		LlmDialogue.request_agenda(agent_name, personality, backstory, _on_agenda_received)
+	else:
+		# Fallback: template agenda based on personality
+		agenda = _get_template_agenda()
+
+func _get_template_agenda() -> Array:
+	match personality:
+		"curious":
+			return [
+				{"activity": "morning coffee", "zone": "cafe", "done": false},
+				{"activity": "explore the park", "zone": "park", "done": false},
+				{"activity": "afternoon people-watching", "zone": "town_square", "done": false},
+			]
+		"shy":
+			return [
+				{"activity": "quiet spot in the park", "zone": "park", "done": false},
+				{"activity": "wander around", "zone": "cafe", "done": false},
+				{"activity": "park bench evening", "zone": "park", "done": false},
+			]
+		"social":
+			return [
+				{"activity": "morning chat in the square", "zone": "town_square", "done": false},
+				{"activity": "lunch at the cafe", "zone": "cafe", "done": false},
+				{"activity": "evening socializing", "zone": "town_square", "done": false},
+			]
+		"wanderer":
+			return [
+				{"activity": "park stroll", "zone": "park", "done": false},
+				{"activity": "cafe visit", "zone": "cafe", "done": false},
+				{"activity": "town square loop", "zone": "town_square", "done": false},
+				{"activity": "back to the park", "zone": "park", "done": false},
+			]
+		"lazy":
+			return [
+				{"activity": "all day at the cafe", "zone": "cafe", "done": false},
+			]
+		_:
+			return [
+				{"activity": "visit the park", "zone": "park", "done": false},
+				{"activity": "stop by the cafe", "zone": "cafe", "done": false},
+			]
+
+func _on_agenda_received(items: Array) -> void:
+	if items.size() > 0:
+		agenda = items
+	else:
+		agenda = _get_template_agenda()
+
+func _get_next_agenda_item() -> Dictionary:
+	for item in agenda:
+		if not item["done"]:
+			return item
+	return {}
+
+func _follow_agenda_item(item: Dictionary) -> void:
+	if not zone_rects.has(item["zone"]):
+		item["done"] = true
+		return
+	var rect: Rect2 = zone_rects[item["zone"]]
+	var target_pos: Vector2 = Vector2(
+		randf_range(rect.position.x + 30, rect.end.x - 30),
+		randf_range(rect.position.y + 30, rect.end.y - 30)
+	)
+	nav_agent.target_position = target_pos
+	show_action_text("→ %s" % item["activity"])
+	state = State.MOVING_TO_ZONE
+	state_changed.emit(agent_name, "moving_to_zone")
 
 # --- GFX-002: Interaction indicator ---
 func _draw() -> void:
