@@ -59,6 +59,18 @@ func _ready() -> void:
 	# Start in IDLE
 	_enter_idle()
 
+	# INT-001: Area2D proximity detection
+	var detection_area := Area2D.new()
+	var cshape := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = 80.0
+	cshape.shape = circle
+	detection_area.add_child(cshape)
+	detection_area.monitoring = true
+	detection_area.monitorable = true
+	add_child(detection_area)
+	detection_area.area_entered.connect(_on_area_entered)
+
 func get_state_name() -> String:
 	match state:
 		State.IDLE:
@@ -233,7 +245,13 @@ func _move_toward_nav_target() -> void:
 	velocity = direction * speed
 	move_and_slide()
 
-# --- Called by main.gd to check for nearby agents ---
+# --- Area2D proximity signal handler (INT-001) ---
+func _on_area_entered(area: Area2D) -> void:
+	var other = area.get_parent()
+	if other != self and other is CharacterBody2D:
+		check_nearby(other)
+
+# --- Called to check for nearby agents ---
 func check_nearby(other: CharacterBody2D) -> void:
 	if state == State.INTERACT or state == State.SEEK:
 		return

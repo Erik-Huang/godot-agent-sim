@@ -89,11 +89,8 @@ func _spawn_agents() -> void:
 		agents.append(agent)
 		ui_panel.register_agent(data["name"], data["personality"])
 
-func _physics_process(_delta: float) -> void:
-	for agent in agents:
-		for other in agents:
-			if agent != other:
-				agent.check_nearby(other)
+# INT-001: Proximity detection moved to Area2D signals on each agent
+# The O(n²) loop is no longer needed here
 
 func _on_agent_interaction(agent_name: String, other_name: String, dialogue: String) -> void:
 	ui_panel.log_interaction(agent_name, other_name, dialogue)
