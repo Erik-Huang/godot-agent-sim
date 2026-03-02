@@ -223,15 +223,33 @@ func _enter_interact(other: CharacterBody2D) -> void:
 	interact_partner = other
 	show_action_text("Chatting...")
 	state_changed.emit(agent_name, "interact")
+	# AUDIT-001: Notify partner so both agents enter INTERACT state
+	if other.has_method("receive_interaction"):
+		other.receive_interaction(self)
 	# Request dialogue from LLM system
 	if LlmDialogue:
 		LlmDialogue.request_dialogue(self, other)
 
+# AUDIT-001: Allow another agent to pull us into an interaction
+func receive_interaction(initiator: CharacterBody2D) -> void:
+	if state == State.INTERACT or state == State.SEEK:
+		return
+	interact_partner = initiator
+	interact_timer = 5.0
+	interaction_cooldown = 5.0
+	velocity = Vector2.ZERO
+	state = State.INTERACT
+	queue_redraw()
+	state_changed.emit(agent_name, "interact")
+
 func _process_interact(delta: float) -> void:
 	velocity = Vector2.ZERO
 	interact_timer -= delta
-	# GFX-002: Redraw interaction line each frame
+	# AUDIT-001: Face toward interaction partner
 	if interact_partner and is_instance_valid(interact_partner):
+		var face_dir: Vector2 = (interact_partner.global_position - global_position).normalized()
+		if face_dir.length() > 0.01:
+			sprite.flip_h = face_dir.x < 0.0
 		queue_redraw()
 	if interact_timer <= 0.0:
 		_enter_idle()
