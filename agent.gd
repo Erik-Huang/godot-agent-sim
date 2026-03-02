@@ -60,6 +60,7 @@ func _ready() -> void:
 	speech_bubble.visible = false
 
 	# Apply speed modifier based on personality
+	# TODO (ARCH-003): replace match blocks with PersonalityProfile resource once .tres files created
 	match personality:
 		"lazy":
 			speed = 30.0
