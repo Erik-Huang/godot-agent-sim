@@ -4,13 +4,7 @@ extends Node
 var dialogue_cache: Dictionary = {}
 const CACHE_TTL: float = 60.0
 
-var fallback_templates: Dictionary = {
-	"curious": ["What are you doing?", "Tell me more!", "Interesting...", "Ooh, what's that?"],
-	"shy": ["Oh... hi.", "I feel crowded...", "Maybe later.", "Um..."],
-	"social": ["Hey! Great to see you!", "Love this place!", "Let's hang out!", "You're awesome!"],
-	"wanderer": ["Just passing through.", "Always moving.", "The road calls.", "Places to be."],
-	"lazy": ["Ugh, more walking.", "Can we stop?", "Five more minutes...", "So tired."],
-}
+# ARCH-001: Fallback templates now sourced from ContentData.PERSONALITY_LINES
 
 func _get_cache_key(name_a: String, name_b: String) -> String:
 	var names: Array = [name_a, name_b]
@@ -18,8 +12,8 @@ func _get_cache_key(name_a: String, name_b: String) -> String:
 	return "%s:%s" % [names[0], names[1]]
 
 func _get_fallback(personality: String) -> String:
-	if fallback_templates.has(personality):
-		var options: Array = fallback_templates[personality]
+	if ContentData.PERSONALITY_LINES.has(personality):
+		var options: Array = ContentData.PERSONALITY_LINES[personality]
 		return options[randi() % options.size()]
 	return "..."
 
