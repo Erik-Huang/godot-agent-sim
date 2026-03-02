@@ -5,6 +5,13 @@
 
 ---
 
+## Known Bugs / Already Fixed
+
+- **INT-001 area_entered one-shot** — `area_entered` signal fires once on zone entry. If `seek_chance` roll misses that single frame, interaction never triggers again until agents fully leave and re-enter the detection radius. Fix: store `detection_area` ref as class var, poll `get_overlapping_areas()` each frame during `_process_idle` and `_process_wander` — same result as old per-frame loop but O(k) where k = agents currently in range.
+- **ARCH-001 autoload ordering** — `class_name ContentData` not resolved when `Thoughts` and `LlmDialogue` autoloads parse at startup. Fix: register `ContentData` as an autoload node (`extends Node`) before the others in `project.godot`. Godot 4 does not guarantee `class_name` resolution order during autoload initialisation.
+
+---
+
 ## Audit Notes
 
 Key findings from codebase review before this plan was finalised:
