@@ -316,6 +316,8 @@ func _enter_moving_to_zone() -> void:
 	state_changed.emit(agent_name, "moving_to_zone")
 
 func _process_moving_to_zone(_delta: float) -> void:
+	# AUDIT-014: Allow interactions while traveling between zones
+	_poll_nearby_agents()
 	if nav_agent.is_navigation_finished():
 		_enter_idle()
 		return
