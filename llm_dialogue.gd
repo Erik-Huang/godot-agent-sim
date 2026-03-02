@@ -9,6 +9,12 @@ var _active_requests: int = 0
 var _request_queue: Array = []  # Array of Callable
 const MAX_CONCURRENT: int = 3
 
+# AUDIT-011: Dynamic agent name list for importance heuristic
+var _known_agent_names: Array = []
+
+func register_agents(names: Array) -> void:
+	_known_agent_names = names
+
 # ARCH-001: Fallback templates now sourced from ContentData.PERSONALITY_LINES
 
 func _get_cache_key(name_a: String, name_b: String) -> String:
@@ -53,7 +59,8 @@ func rate_importance(agent_name: String, text: String) -> int:
 func _heuristic_importance(text: String) -> int:
 	var lower: String = text.to_lower()
 	# Check for agent names (interaction-related)
-	var agent_names: Array = ["alice", "bob", "carol", "dave", "eve"]
+	# AUDIT-011: Use dynamically registered agent names
+	var agent_names: Array = _known_agent_names
 	for aname in agent_names:
 		if lower.find(aname.to_lower()) != -1:
 			return 7

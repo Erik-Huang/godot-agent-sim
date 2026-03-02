@@ -163,6 +163,8 @@ func _spawn_agents() -> void:
 		agent_container.add_child(agent)
 		agents.append(agent)
 		ui_panel.register_agent(data["name"], data["personality"])
+	# AUDIT-011: Register agent names for dynamic importance heuristic
+	LlmDialogue.register_agents(agents.map(func(a): return a.agent_name.to_lower()))
 
 # INT-001: Proximity detection moved to Area2D signals on each agent
 # The O(n²) loop is no longer needed here
