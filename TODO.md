@@ -1,6 +1,6 @@
 # godot-agent-sim — TODO
 
-*Last updated: 2026-03-02 | Branch: phase-1-implementation*
+*Last updated: 2026-03-02 | Branch: main*
 
 ---
 
@@ -19,34 +19,11 @@ All shipped. Key wins:
 ## ✅ Phase 2 — Complete
 
 All shipped. Key wins:
-- **Debug**: spacebar pause + PAUSED overlay; all labels white, sized, outlined
-- **Memory depth**: social relationship sentiment, exponential recency decay
-- **Behavior**: 6 named social waypoints, interactions during travel
-- **Visual**: time-of-day lighting (60x sim speed, dawn/dusk/night), upgraded thought bubble with last-memory line
-- **Architecture**: AgentDefinition + PersonalityProfile resource stubs, centralised world bounds, dynamic agent names, UI label pool
-
----
-
-## Phase 2 — Next Up
-
-### Memory
-- **MEM-004** — Social relationship tracking: per-agent `{other: {count, last_seen, sentiment}}` dict in MemoryService; sentiment biases seek_chance. *Effort: Medium | Impact: High*
-- **AUDIT-013** — Memory recency decay is broken: `1/age` drops below noise after 5s. Replace with `exp(-age_sec / 3600.0)` for meaningful hourly decay. *Effort: Low | Impact: Medium*
-
-### Interaction & Behavior
-- **INT-005** — Social waypoints: 2–3 named hotspots per zone (bench, fountain); 20% idle chance to path there, increases encounter density. *Effort: Medium | Impact: Medium*
-- **AUDIT-014** — Agents don't interact while traveling: add `_poll_nearby_agents()` to `_process_moving_to_zone()`. *Effort: Trivial | Impact: Low*
-
-### Graphics
-- **GFX-003** — Upgraded thought bubble: 9-patch bubble with tail, show dialogue + last memory line, tween in/out. *Requires MEM-001 ✅ | Effort: Medium | Impact: High*
-- **GFX-005** — Time-of-day lighting: `CanvasModulate` tweening day→evening→night at 60x sim speed; agents zone-shift by hour. *Effort: Medium | Impact: High*
-
-### Architecture
-- **ARCH-002** — AgentDefinition resource: move hardcoded agent dicts in `main.gd` to `.tres` files; drag-and-drop roster in inspector. *Effort: Low | Impact: High*
-- **ARCH-003** — PersonalityProfile resource: replace personality match blocks with `@export` resource files. *Effort: Low | Impact: Medium*
-- **AUDIT-011** — Hardcoded agent names in importance heuristic (`llm_dialogue.gd`): query dynamically. *Effort: Low | Impact: Low*
-- **AUDIT-012** — World bounds defined in 3 places with different values: centralise in `main.gd`, pass to agents. *Effort: Low | Impact: Low*
-- **AUDIT-016** — UI label refresh destroys/recreates all nodes every tick: reuse Labels or switch to RichTextLabel. *Effort: Low | Impact: Low*
+- **Debug** (DBG-001/002): Spacebar pause + PAUSED overlay; all labels white, sized, outlined
+- **Memory depth** (MEM-004, AUDIT-013): Social relationship sentiment, exponential recency decay
+- **Behavior** (INT-005, AUDIT-014): 6 named social waypoints, interactions during travel
+- **Visual** (GFX-003/005): Time-of-day lighting (60x sim speed, dawn/dusk/night), upgraded thought bubble with last-memory line
+- **Architecture** (ARCH-002/003, AUDIT-011/012/016): AgentDefinition + PersonalityProfile resource stubs, centralised world bounds, dynamic agent names, UI label pool
 
 ---
 
@@ -62,10 +39,6 @@ All shipped. Key wins:
 
 - **ContentData autoload order**: must be first in `project.godot` autoload list — `class_name` resolution not guaranteed at parse time
 - **area_entered one-shot**: signal fires once on entry; poll `get_overlapping_areas()` in idle/wander to retry missed rolls
-
-### Debug
-- **DBG-001** — Spacebar pause: `Input.is_action_just_pressed("ui_accept")` in `main.gd._process()`; toggle `get_tree().paused`; show "PAUSED" overlay label centred on screen. Add `pause_mode = PAUSE_MODE_PROCESS` to UI so overlay stays visible. *Effort: Low | Impact: Medium*
-- **DBG-002** — Readable text: all in-world labels are too small and dark on the grey background. Set name labels → size 14, white (`Color.WHITE`); speech bubble text → size 13, white; floating action text → size 12, white; UI side panel → size 13, light grey `Color(0.9, 0.9, 0.95)`. *Effort: Trivial | Impact: High*
 
 ---
 
