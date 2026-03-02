@@ -60,6 +60,8 @@ func _ready() -> void:
 	# DBG-002: Readable speech bubble
 	speech_label.add_theme_font_size_override("font_size", 13)
 	speech_label.add_theme_color_override("font_color", Color.WHITE)
+	# GFX-003: Allow 2 lines in speech bubble for dialogue + memory snippet
+	speech_bubble.custom_minimum_size = Vector2(140, 40)
 	speech_bubble.visible = false
 
 	# Apply speed modifier based on personality
@@ -291,7 +293,16 @@ func _process_interact(delta: float) -> void:
 		_enter_idle()
 
 func show_speech(text: String) -> void:
-	speech_label.text = text
+	# GFX-003: Enrich bubble with last memory snippet
+	var display_text: String = text
+	if MemoryService:
+		var top_mems: Array = MemoryService.get_top_memories(agent_name, 1)
+		if top_mems.size() > 0:
+			var snippet: String = top_mems[0]["text"]
+			if snippet.length() > 40:
+				snippet = snippet.substr(0, 37) + "..."
+			display_text += "\n" + snippet
+	speech_label.text = display_text
 	speech_bubble.visible = true
 	speech_timer = 4.0
 
