@@ -169,6 +169,10 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		var fallback: String = _get_fallback(agent.personality)
 		agent.show_speech(fallback)
 		agent.interaction_started.emit(agent.agent_name, other.agent_name, fallback)
+		# INT-003: Fallback observation on HTTP failure
+		if MemoryService and is_instance_valid(other):
+			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
+			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"])
 		return
 
 	var json: JSON = JSON.new()
@@ -177,6 +181,10 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		var fallback: String = _get_fallback(agent.personality)
 		agent.show_speech(fallback)
 		agent.interaction_started.emit(agent.agent_name, other.agent_name, fallback)
+		# INT-003: Fallback observation on parse failure
+		if MemoryService and is_instance_valid(other):
+			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
+			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"])
 		return
 
 	var data: Dictionary = json.data
@@ -186,7 +194,17 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		dialogue_cache[cache_key] = {"text": text, "time": Time.get_ticks_msec() / 1000.0}
 		agent.show_speech(text)
 		agent.interaction_started.emit(agent.agent_name, other.agent_name, text)
+		# INT-003: Information propagation — store interaction memories
+		if MemoryService and is_instance_valid(other):
+			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
+			var obs_text: String = "I talked to %s near the %s. They said: '%s'" % [other.agent_name, zone_name, text]
+			MemoryService.add_observation(agent.agent_name, obs_text, 6, ["social", "interaction"])
+			MemoryService.add_observation(other.agent_name, "I was approached by %s in the %s" % [agent.agent_name, zone_name], 5, ["social"])
 	else:
 		var fallback: String = _get_fallback(agent.personality)
 		agent.show_speech(fallback)
 		agent.interaction_started.emit(agent.agent_name, other.agent_name, fallback)
+		# INT-003: Fallback observation when LLM returns no choices
+		if MemoryService and is_instance_valid(other):
+			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
+			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"])
