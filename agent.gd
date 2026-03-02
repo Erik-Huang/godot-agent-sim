@@ -18,6 +18,7 @@ var seek_target: CharacterBody2D = null
 var speech_timer: float = 0.0
 var current_zone: String = ""
 var interact_partner: CharacterBody2D = null
+var detection_area: Area2D = null
 var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
 
@@ -94,6 +95,7 @@ func _ready() -> void:
 	detection_area.monitorable = true
 	add_child(detection_area)
 	detection_area.area_entered.connect(_on_area_entered)
+	self.detection_area = detection_area
 
 func get_state_name() -> String:
 	match state:
@@ -153,6 +155,7 @@ func _enter_idle() -> void:
 	state_changed.emit(agent_name, "idle")
 
 func _process_idle(delta: float) -> void:
+	_poll_nearby_agents()
 	idle_timer -= delta
 	if idle_timer <= 0.0:
 		# Decide next action
@@ -184,6 +187,7 @@ func _pick_wander_target() -> void:
 	nav_agent.target_position = target_pos
 
 func _process_wander(_delta: float) -> void:
+	_poll_nearby_agents()
 	if nav_agent.is_navigation_finished():
 		_enter_idle()
 		return
@@ -297,6 +301,19 @@ func _move_toward_nav_target() -> void:
 	var direction: Vector2 = (next_pos - global_position).normalized()
 	velocity = direction * speed
 	move_and_slide()
+
+
+# INT-001 fix: re-check overlapping agents each frame while idle/wander
+# area_entered fires once; this ensures missed rolls get retried
+func _poll_nearby_agents() -> void:
+	if detection_area == null:
+		return
+	for area in detection_area.get_overlapping_areas():
+		var other = area.get_parent()
+		if other != self and other is CharacterBody2D:
+			check_nearby(other)
+			if state == State.SEEK or state == State.INTERACT:
+				return
 
 # --- Area2D proximity signal handler (INT-001) ---
 func _on_area_entered(area: Area2D) -> void:
