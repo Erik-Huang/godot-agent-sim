@@ -1,10 +1,7 @@
 # content_data.gd — Single source of truth for personality-based text lines
 # ARCH-001: Merged from duplicate dicts in thoughts.gd and llm_dialogue.gd
+extends Node
 
-class_name ContentData
-
-# Personality-based lines used for both fallback dialogue and idle thoughts.
-# thoughts.gd had a few extra entries per personality; we keep the superset.
 const PERSONALITY_LINES: Dictionary = {
 	"curious": ["What are you doing?", "Tell me more!", "Interesting...", "Ooh, what's that?", "I wonder why..."],
 	"shy": ["Oh... hi.", "I feel crowded...", "Maybe later.", "Um...", "I'll just be over here."],
