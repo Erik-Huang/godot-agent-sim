@@ -188,6 +188,9 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		dialogue_cache[cache_key] = {"text": text, "time": Time.get_ticks_msec() / 1000.0}
 		agent.show_speech(text)
 		agent.interaction_started.emit(agent.agent_name, other.agent_name, text)
+		# AUDIT-003: Partner response — show fallback immediately, replace with LLM if available
+		if is_instance_valid(other):
+			_generate_partner_response(agent, other, text)
 		# INT-003: Information propagation — store interaction memories
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
@@ -202,3 +205,65 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
 			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"])
+
+
+# AUDIT-003: Generate a response for the interaction partner
+func _generate_partner_response(agent: CharacterBody2D, other: CharacterBody2D, initiator_text: String) -> void:
+	if not is_instance_valid(other):
+		return
+	# Show fallback reaction immediately after a 1.5s delay
+	var fallback: String = _get_fallback(other.personality)
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	await tree.create_timer(1.5).timeout
+	if not is_instance_valid(other):
+		return
+	other.show_speech(fallback)
+
+	# If API key present, make a short LLM call to replace fallback
+	var api_key: String = OS.get_environment("OPENAI_API_KEY")
+	if api_key == "":
+		return
+
+	var http: HTTPRequest = HTTPRequest.new()
+	add_child(http)
+
+	var memories_block: String = _format_memories_block(other.agent_name, 2)
+	var prompt_text: String = "You are %s, a %s person.\n%s%s just said to you: \"%s\"\nWrite a SHORT reply (max 8 words). Reply with ONLY the sentence." % [
+		other.agent_name, other.personality, memories_block, agent.agent_name, initiator_text
+	]
+
+	var body: Dictionary = {
+		"model": "gpt-4o-mini",
+		"messages": [
+			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+			{"role": "user", "content": prompt_text}
+		],
+		"max_tokens": 30,
+		"temperature": 0.8,
+	}
+
+	var headers: PackedStringArray = PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Bearer %s" % api_key,
+	])
+
+	var json_body: String = JSON.stringify(body)
+
+	http.request_completed.connect(
+		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
+			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
+				var json := JSON.new()
+				if json.parse(body_bytes.get_string_from_utf8()) == OK:
+					var data: Dictionary = json.data
+					if data.has("choices") and data["choices"].size() > 0:
+						var reply_text: String = data["choices"][0]["message"]["content"].strip_edges()
+						if is_instance_valid(other):
+							other.show_speech(reply_text)
+			http.queue_free()
+	)
+
+	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
+	if err != OK:
+		http.queue_free()
