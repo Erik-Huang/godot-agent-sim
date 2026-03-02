@@ -4,6 +4,11 @@ extends Node
 var dialogue_cache: Dictionary = {}
 const CACHE_TTL: float = 60.0
 
+# AUDIT-007: LLM request queue for rate limiting
+var _active_requests: int = 0
+var _request_queue: Array = []  # Array of Callable
+const MAX_CONCURRENT: int = 3
+
 # ARCH-001: Fallback templates now sourced from ContentData.PERSONALITY_LINES
 
 func _get_cache_key(name_a: String, name_b: String) -> String:
@@ -16,6 +21,21 @@ func _get_fallback(personality: String) -> String:
 		var options: Array = ContentData.PERSONALITY_LINES[personality]
 		return options[randi() % options.size()]
 	return "..."
+
+# AUDIT-007: Queue-based rate limiting for LLM requests
+func _dispatch_or_queue(callable: Callable) -> void:
+	if _active_requests < MAX_CONCURRENT:
+		_active_requests += 1
+		callable.call()
+	else:
+		_request_queue.append(callable)
+
+func _dispatch_next() -> void:
+	_active_requests -= 1
+	if _request_queue.size() > 0 and _active_requests < MAX_CONCURRENT:
+		var next: Callable = _request_queue.pop_front()
+		_active_requests += 1
+		next.call()
 
 # MEM-002: Importance scoring
 # Returns an importance rating 1-10 for an observation text.
@@ -117,6 +137,12 @@ func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 		agent.interaction_started.emit(agent.agent_name, other.agent_name, fallback)
 		return
 
+	# AUDIT-007: Queue the HTTP dispatch for rate limiting
+	_dispatch_or_queue(func() -> void:
+		_do_dialogue_request(agent, other, cache_key, api_key)
+	)
+
+func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_key: String, api_key: String) -> void:
 	# Create HTTP request
 	var http: HTTPRequest = HTTPRequest.new()
 	add_child(http)
@@ -145,6 +171,8 @@ func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 	http.request_completed.connect(
 		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
 			_on_request_completed(result, response_code, body_bytes, agent, other, cache_key)
+			# AUDIT-007: Dispatch next queued request
+			_dispatch_next()
 			http.queue_free()
 	)
 
@@ -153,6 +181,7 @@ func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 		var fallback: String = _get_fallback(agent.personality)
 		agent.show_speech(fallback)
 		agent.interaction_started.emit(agent.agent_name, other.agent_name, fallback)
+		_dispatch_next()
 		http.queue_free()
 
 func _on_request_completed(result: int, response_code: int, body_bytes: PackedByteArray, agent: CharacterBody2D, other: CharacterBody2D, cache_key: String) -> void:
