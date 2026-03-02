@@ -159,6 +159,9 @@ func _enter_idle() -> void:
 func _process_idle(delta: float) -> void:
 	_poll_nearby_agents()
 	idle_timer -= delta
+	# AUDIT-010: Occasionally surface an idle thought via Thoughts autoload
+	if idle_timer > 0.0 and speech_timer <= 0.0 and randf() < 0.01:
+		show_speech(Thoughts.get_thought(personality))
 	if idle_timer <= 0.0:
 		# Decide next action
 		var roll: float = randf()
