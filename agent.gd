@@ -56,6 +56,8 @@ func _ready() -> void:
 	img.fill(agent_color)
 	var tex: ImageTexture = ImageTexture.create_from_image(img)
 	sprite.texture = tex
+	# GFX-006: Hide Sprite2D — _draw() handles visuals now
+	sprite.visible = false
 
 	# Set collision shape
 	var shape: RectangleShape2D = RectangleShape2D.new()
@@ -142,6 +144,8 @@ func get_state_name() -> String:
 	return "unknown"
 
 func _physics_process(delta: float) -> void:
+	# GFX-006: Redraw each frame for direction indicator
+	queue_redraw()
 	# Speech bubble timer
 	if speech_timer > 0.0:
 		speech_timer -= delta
@@ -182,7 +186,6 @@ func _enter_idle() -> void:
 	velocity = Vector2.ZERO
 	interact_partner = null
 	seek_target = null  # AUDIT-004: clear stale seek_target
-	queue_redraw()
 	state_changed.emit(agent_name, "idle")
 
 func _process_idle(delta: float) -> void:
@@ -298,7 +301,6 @@ func receive_interaction(initiator: CharacterBody2D) -> void:
 	interaction_cooldown = 5.0
 	velocity = Vector2.ZERO
 	state = State.INTERACT
-	queue_redraw()
 	state_changed.emit(agent_name, "interact")
 
 func _process_interact(delta: float) -> void:
@@ -308,8 +310,7 @@ func _process_interact(delta: float) -> void:
 	if interact_partner and is_instance_valid(interact_partner):
 		var face_dir: Vector2 = (interact_partner.global_position - global_position).normalized()
 		if face_dir.length() > 0.01:
-			sprite.flip_h = face_dir.x < 0.0
-		queue_redraw()
+			last_move_dir = face_dir  # GFX-006: Update direction indicator to face partner
 	if interact_timer <= 0.0:
 		_enter_idle()
 
@@ -436,8 +437,20 @@ func _follow_agenda_item(item: Dictionary) -> void:
 	state = State.MOVING_TO_ZONE
 	state_changed.emit(agent_name, "moving_to_zone")
 
-# --- GFX-002: Interaction indicator ---
+# --- GFX-006: Direction-aware procedural sprites ---
 func _draw() -> void:
+	# Body circle
+	draw_circle(Vector2.ZERO, 10.0, agent_color)
+	# Direction indicator (nose)
+	var nose_tip: Vector2 = last_move_dir.normalized() * 14.0
+	var perp: Vector2 = Vector2(-last_move_dir.y, last_move_dir.x).normalized() * 4.0
+	var pts: PackedVector2Array = PackedVector2Array([
+		nose_tip,
+		-last_move_dir.normalized() * 2.0 + perp,
+		-last_move_dir.normalized() * 2.0 - perp,
+	])
+	draw_colored_polygon(pts, agent_color.lightened(0.4))
+	# GFX-002: INTERACT indicator line
 	if state == State.INTERACT and interact_partner and is_instance_valid(interact_partner):
 		var target_local: Vector2 = interact_partner.global_position - global_position
 		draw_line(Vector2.ZERO, target_local, Color(1.0, 1.0, 1.0, 0.4), 1.5)
