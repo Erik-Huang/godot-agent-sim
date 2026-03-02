@@ -23,6 +23,74 @@ func _get_fallback(personality: String) -> String:
 		return options[randi() % options.size()]
 	return "..."
 
+# MEM-002: Importance scoring
+# Returns an importance rating 1-10 for an observation text.
+# Uses heuristics if no API key; async LLM call otherwise (fire-and-forget update).
+func rate_importance(agent_name: String, text: String) -> int:
+	var api_key: String = OS.get_environment("OPENAI_API_KEY")
+	if api_key == "":
+		return _heuristic_importance(text)
+
+	# Fire async LLM call to rate importance; return heuristic for now
+	var initial: int = _heuristic_importance(text)
+	_async_rate_importance(agent_name, text, api_key)
+	return initial
+
+func _heuristic_importance(text: String) -> int:
+	var lower: String = text.to_lower()
+	# Check for agent names (interaction-related)
+	var agent_names: Array = ["alice", "bob", "carol", "dave", "eve"]
+	for aname in agent_names:
+		if lower.find(aname.to_lower()) != -1:
+			return 7
+	if lower.find("interact") != -1 or lower.find("talked") != -1 or lower.find("said") != -1:
+		return 7
+	if lower.find("park") != -1 or lower.find("cafe") != -1 or lower.find("town") != -1 or lower.find("zone") != -1:
+		return 3
+	return 4
+
+func _async_rate_importance(agent_name: String, text: String, api_key: String) -> void:
+	var http: HTTPRequest = HTTPRequest.new()
+	add_child(http)
+
+	var prompt_text: String = "Rate 1-10 how significant this event is for %s: '%s'. Reply with only a number." % [agent_name, text]
+
+	var body: Dictionary = {
+		"model": "gpt-4o-mini",
+		"messages": [{"role": "user", "content": prompt_text}],
+		"max_tokens": 5,
+		"temperature": 0.0,
+	}
+
+	var headers: PackedStringArray = PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Bearer %s" % api_key,
+	])
+
+	var json_body: String = JSON.stringify(body)
+
+	http.request_completed.connect(
+		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
+			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
+				var json := JSON.new()
+				if json.parse(body_bytes.get_string_from_utf8()) == OK:
+					var data: Dictionary = json.data
+					if data.has("choices") and data["choices"].size() > 0:
+						var rating_text: String = data["choices"][0]["message"]["content"].strip_edges()
+						var rating: int = clampi(rating_text.to_int(), 1, 10)
+						# Update the observation in MemoryService if it exists
+						if MemoryService and MemoryService.observations.has(agent_name):
+							for obs in MemoryService.observations[agent_name]:
+								if obs["text"] == text:
+									obs["importance"] = rating
+									break
+			http.queue_free()
+	)
+
+	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
+	if err != OK:
+		http.queue_free()
+
 func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 	var cache_key: String = _get_cache_key(agent.agent_name, other.agent_name)
 
