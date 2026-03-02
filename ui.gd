@@ -10,8 +10,8 @@ const MAX_LOG_ENTRIES: int = 10
 func register_agent(agent_name: String, personality: String) -> void:
 	var entry: Label = Label.new()
 	entry.name = agent_name
-	entry.add_theme_font_size_override("font_size", 11)
-	entry.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+	entry.add_theme_font_size_override("font_size", 13)
+	entry.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
 	entry.text = "%s [%s] - idle" % [agent_name, personality]
 	agent_list.add_child(entry)
 	agent_entries[agent_name] = {"label": entry, "personality": personality}

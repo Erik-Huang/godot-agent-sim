@@ -46,6 +46,14 @@ func _ready() -> void:
 	collision_shape.shape = shape
 
 	name_label.text = agent_name
+	# DBG-002: Readable name labels
+	name_label.add_theme_font_size_override("font_size", 14)
+	name_label.add_theme_color_override("font_color", Color.WHITE)
+	name_label.add_theme_constant_override("outline_size", 2)
+	name_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	# DBG-002: Readable speech bubble
+	speech_label.add_theme_font_size_override("font_size", 13)
+	speech_label.add_theme_color_override("font_color", Color.WHITE)
 	speech_bubble.visible = false
 
 	# Apply speed modifier based on personality
@@ -306,7 +314,7 @@ func _draw() -> void:
 func show_action_text(text: String) -> void:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	label.position = Vector2(-20, -45)
 	label.z_index = 10
