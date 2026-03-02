@@ -152,8 +152,10 @@ func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_
 
 	# MEM-003 + INT-002: Richer prompt with memory context
 	var memories_block: String = _format_memories_block(agent.agent_name, 3)
+	# AUDIT-009: Default to "between areas" when zone string is empty
+	var zone_name: String = agent.current_zone if agent.current_zone != "" else "between areas"
 	var prompt_text: String = "You are %s, a %s person currently in the %s area.\n%sYou just encountered %s, who is %s.\nWrite ONE sentence (max 12 words) you would say to them. Reply with ONLY the sentence." % [
-		agent.agent_name, agent.personality, agent.current_zone, memories_block, other.agent_name, other.personality
+		agent.agent_name, agent.personality, zone_name, memories_block, other.agent_name, other.personality
 	]
 
 	var body: Dictionary = {
