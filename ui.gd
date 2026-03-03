@@ -74,13 +74,13 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 
 	# Margin inside card
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 6)
-	margin.add_theme_constant_override("margin_top", 4)
-	margin.add_theme_constant_override("margin_right", 6)
-	margin.add_theme_constant_override("margin_bottom", 4)
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_bottom", 6)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 3)
+	vbox.add_theme_constant_override("separation", 5)
 
 	# Header row: color dot + name [personality]
 	var header_row := HBoxContainer.new()
@@ -92,7 +92,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	header_row.add_child(color_dot)
 	var header_label := Label.new()
 	header_label.text = "%s [%s]" % [agent_name, personality_tag]
-	_apply_font(header_label, 8)
+	_apply_font(header_label, 12)
 	header_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
 	header_row.add_child(header_label)
 	vbox.add_child(header_row)
@@ -100,14 +100,14 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	# State + zone row
 	var state_label := Label.new()
 	state_label.text = "idle | —"
-	_apply_font(state_label, 8)
+	_apply_font(state_label, 11)
 	_apply_muted_color(state_label)
 	vbox.add_child(state_label)
 
 	# Agenda
 	var agenda_label := Label.new()
 	agenda_label.text = "agenda: —"
-	_apply_font(agenda_label, 8)
+	_apply_font(agenda_label, 11)
 	_apply_muted_color(agenda_label)
 	vbox.add_child(agenda_label)
 
@@ -116,7 +116,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	mood_row.add_theme_constant_override("separation", 4)
 	var mood_text := Label.new()
 	mood_text.text = "mood:"
-	_apply_font(mood_text, 8)
+	_apply_font(mood_text, 11)
 	_apply_muted_color(mood_text)
 	mood_row.add_child(mood_text)
 	var mood_bar_bg := ColorRect.new()
@@ -136,7 +136,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	# Last memory
 	var memory_label := Label.new()
 	memory_label.text = "mem: —"
-	_apply_font(memory_label, 8)
+	_apply_font(memory_label, 10)
 	memory_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
 	memory_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	memory_label.custom_minimum_size.x = 0
@@ -145,7 +145,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	# Last speech
 	var speech_label := Label.new()
 	speech_label.text = ""
-	_apply_font(speech_label, 8)
+	_apply_font(speech_label, 10)
 	speech_label.add_theme_color_override("font_color", Color(0.75, 0.8, 0.7))
 	speech_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	speech_label.custom_minimum_size.x = 0
@@ -251,7 +251,7 @@ func log_interaction(agent_name: String, other_name: String, dialogue: String) -
 func _refresh_log() -> void:
 	while _log_labels.size() < log_entries.size():
 		var label: Label = Label.new()
-		_apply_font(label, 8)
+		_apply_font(label, 10)
 		label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.6))
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size.x = 230

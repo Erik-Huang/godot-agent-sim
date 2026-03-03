@@ -96,8 +96,8 @@ func _ready() -> void:
 	screen_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_layer.add_child(screen_root)
 
-	# outer_panel is a plain Control anchored to right 20% — this does the positioning
-	var outer_panel := Control.new()
+	# outer_panel: MarginContainer anchored to right 20% — sizes its child correctly
+	var outer_panel := MarginContainer.new()
 	outer_panel.name = "OuterPanel"
 	outer_panel.anchor_left = 0.8
 	outer_panel.anchor_right = 1.0
@@ -107,16 +107,18 @@ func _ready() -> void:
 	outer_panel.offset_right = 0.0
 	outer_panel.offset_top = 0.0
 	outer_panel.offset_bottom = 0.0
+	outer_panel.add_theme_constant_override("margin_left", 0)
+	outer_panel.add_theme_constant_override("margin_top", 0)
+	outer_panel.add_theme_constant_override("margin_right", 0)
+	outer_panel.add_theme_constant_override("margin_bottom", 0)
 	screen_root.add_child(outer_panel)
 
-	# Move UIPanel into outer_panel and make it fill the full outer_panel
+	# Move UIPanel into outer_panel — SIZE_EXPAND_FILL so VBoxContainer fills it
+	# Do NOT use set_anchors_preset on VBoxContainer — it breaks layout
 	ui_panel.get_parent().remove_child(ui_panel)
 	outer_panel.add_child(ui_panel)
-	ui_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	ui_panel.offset_left = 0.0
-	ui_panel.offset_right = 0.0
-	ui_panel.offset_top = 0.0
-	ui_panel.offset_bottom = 0.0
+	ui_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ui_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	ui_panel.clip_contents = true
 
 	# Wrap AgentList in ScrollContainer so cards don't overflow
@@ -134,13 +136,16 @@ func _ready() -> void:
 		scroll.add_child(agent_list_node)
 		agent_list_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	# Fix UIBackground: move it OUT of VBoxContainer so it's a real backdrop
+	# UIBackground: anchor it directly to screen_root behind outer_panel
 	var ui_bg: ColorRect = ui_panel.get_node_or_null("UIBackground")
 	if ui_bg:
 		ui_panel.remove_child(ui_bg)
-		outer_panel.add_child(ui_bg)
-		outer_panel.move_child(ui_bg, 0)  # Draw behind everything
-		ui_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		screen_root.add_child(ui_bg)
+		screen_root.move_child(ui_bg, 0)
+		ui_bg.anchor_left = 0.8
+		ui_bg.anchor_right = 1.0
+		ui_bg.anchor_top = 0.0
+		ui_bg.anchor_bottom = 1.0
 		ui_bg.offset_left = 0.0
 		ui_bg.offset_right = 0.0
 		ui_bg.offset_top = 0.0
