@@ -88,9 +88,18 @@ func _ready() -> void:
 	ui_layer.layer = 10
 	ui_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(ui_layer)
+
+	# Anchors only resolve against a Control parent — add full-screen wrapper
+	var screen_root := Control.new()
+	screen_root.name = "ScreenRoot"
+	screen_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	screen_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(screen_root)
+
 	ui_panel.get_parent().remove_child(ui_panel)
-	ui_layer.add_child(ui_panel)
-	# Anchor to right 20% of viewport
+	screen_root.add_child(ui_panel)
+
+	# Anchor to right 20% of viewport (works now that parent is a Control)
 	ui_panel.anchor_left = 0.8
 	ui_panel.anchor_right = 1.0
 	ui_panel.anchor_top = 0.0
@@ -99,6 +108,22 @@ func _ready() -> void:
 	ui_panel.offset_right = 0
 	ui_panel.offset_top = 0
 	ui_panel.offset_bottom = 0
+	ui_panel.clip_contents = true
+
+	# Wrap AgentList in ScrollContainer so cards don't overflow below panel
+	var agent_list_node: VBoxContainer = ui_panel.get_node_or_null("AgentList")
+	if agent_list_node:
+		var scroll := ScrollContainer.new()
+		scroll.name = "AgentScroll"
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		var al_parent := agent_list_node.get_parent()
+		var al_idx := agent_list_node.get_index()
+		al_parent.remove_child(agent_list_node)
+		al_parent.add_child(scroll)
+		al_parent.move_child(scroll, al_idx)
+		scroll.add_child(agent_list_node)
+		agent_list_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# GFX-005: CanvasModulate for time-of-day lighting
 	canvas_mod = CanvasModulate.new()
