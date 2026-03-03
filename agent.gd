@@ -46,6 +46,10 @@ var world_bounds: Rect2 = Rect2(10, 10, 1180, 780)
 # Zone definitions (set by main.gd)
 var zone_rects: Dictionary = {}
 
+# UI-001: Tracking for side panel
+var last_action_text: String = ""
+var last_speech_text: String = ""
+
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var name_label: Label = $NameLabel
@@ -73,12 +77,26 @@ func _ready() -> void:
 	name_label.add_theme_color_override("font_color", Color.WHITE)
 	name_label.add_theme_constant_override("outline_size", 2)
 	name_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	# DBG-002: Readable speech bubble
-	speech_label.add_theme_font_size_override("font_size", 13)
-	speech_label.add_theme_color_override("font_color", Color.WHITE)
-	# GFX-003: Allow 2 lines in speech bubble for dialogue + memory snippet
-	speech_bubble.custom_minimum_size = Vector2(140, 40)
+	# UI-001: Pixel art speech bubble with NinePatch styling
 	speech_bubble.visible = false
+	speech_bubble.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	speech_bubble.custom_minimum_size = Vector2(80, 0)
+	speech_bubble.position = Vector2(-40, -60)
+	if ResourceLoader.exists("res://assets/ui/theme/nine_path_panel.png"):
+		var stylebox := StyleBoxTexture.new()
+		stylebox.texture = load("res://assets/ui/theme/nine_path_panel.png") as Texture2D
+		stylebox.texture_margin_left = 4.0
+		stylebox.texture_margin_top = 4.0
+		stylebox.texture_margin_right = 4.0
+		stylebox.texture_margin_bottom = 4.0
+		speech_bubble.add_theme_stylebox_override("panel", stylebox)
+	if ResourceLoader.exists("res://assets/ui/fonts/NormalFont.ttf"):
+		var font := load("res://assets/ui/fonts/NormalFont.ttf") as Font
+		speech_label.add_theme_font_override("font", font)
+		speech_label.add_theme_font_size_override("font_size", 8)
+	else:
+		speech_label.add_theme_font_size_override("font_size", 13)
+	speech_label.add_theme_color_override("font_color", Color.WHITE)
 
 	# Apply speed modifier based on personality
 	# TODO (ARCH-003): replace match blocks with PersonalityProfile resource once .tres files created
@@ -338,6 +356,7 @@ func _process_interact(delta: float) -> void:
 		_enter_idle()
 
 func show_speech(text: String) -> void:
+	last_speech_text = text
 	# GFX-003: Enrich bubble with last memory snippet
 	var display_text: String = text
 	if MemoryService:
@@ -514,6 +533,7 @@ func _draw() -> void:
 
 # --- GFX-001: Floating action text ---
 func show_action_text(text: String) -> void:
+	last_action_text = text
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", 12)
