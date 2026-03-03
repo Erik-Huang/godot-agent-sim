@@ -50,6 +50,10 @@ var zone_rects: Dictionary = {}
 var last_action_text: String = ""
 var last_speech_text: String = ""
 
+# UI-002: Emote icon system
+var emote_icon: TextureRect = null
+var emote_textures: Dictionary = {}
+
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var name_label: Label = $NameLabel
@@ -162,6 +166,44 @@ func _ready() -> void:
 	else:
 		push_warning("No sprite frames found for %s at %s — using _draw() fallback" % [agent_name, frames_path])
 
+	# UI-002: Emote icon above agent head
+	_load_emote_textures()
+	emote_icon = TextureRect.new()
+	emote_icon.position = Vector2(-7, -78)
+	emote_icon.size = Vector2(14, 13)
+	emote_icon.scale = Vector2(2.0, 2.0)
+	emote_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	emote_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	emote_icon.visible = false
+	emote_icon.z_index = 15
+	add_child(emote_icon)
+
+func _load_emote_textures() -> void:
+	var emote_map: Dictionary = {
+		"happy": "res://assets/ui/emotes/emote7.png",
+		"curious": "res://assets/ui/emotes/emote4.png",
+		"alert": "res://assets/ui/emotes/emote3.png",
+		"love": "res://assets/ui/emotes/emote1.png",
+		"sleepy": "res://assets/ui/emotes/emote9.png",
+		"nervous": "res://assets/ui/emotes/emote10.png",
+		"angry": "res://assets/ui/emotes/emote12.png",
+	}
+	for key: String in emote_map:
+		var path: String = emote_map[key]
+		if ResourceLoader.exists(path):
+			emote_textures[key] = load(path) as Texture2D
+
+func show_emote(emote_name: String, duration: float = 2.0) -> void:
+	if not emote_textures.has(emote_name) or emote_icon == null:
+		return
+	emote_icon.texture = emote_textures[emote_name]
+	emote_icon.modulate.a = 1.0
+	emote_icon.visible = true
+	var tween := create_tween()
+	tween.tween_interval(duration)
+	tween.tween_property(emote_icon, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(func() -> void: emote_icon.visible = false; emote_icon.modulate.a = 1.0)
+
 func get_state_name() -> String:
 	match state:
 		State.IDLE:
@@ -239,6 +281,10 @@ func _process_idle(delta: float) -> void:
 	# AUDIT-010: Occasionally surface an idle thought via Thoughts autoload
 	if idle_timer > 0.0 and speech_timer <= 0.0 and randf() < 0.01:
 		show_speech(Thoughts.get_thought(personality))
+		if personality == "lazy":
+			show_emote("sleepy")
+		elif personality == "curious":
+			show_emote("curious")
 	if idle_timer <= 0.0:
 		# Decide next action
 		var roll: float = randf()
@@ -330,6 +376,12 @@ func _enter_interact(other: CharacterBody2D) -> void:
 	# Request dialogue from LLM system
 	if LlmDialogue:
 		LlmDialogue.request_dialogue(self, other)
+	# UI-002: Emote based on sentiment toward partner
+	var _sentiment: float = MemoryService.get_sentiment(agent_name, other.agent_name)
+	if _sentiment > 0.3:
+		show_emote("love")
+	else:
+		show_emote("alert")
 
 # AUDIT-001: Allow another agent to pull us into an interaction
 func receive_interaction(initiator: CharacterBody2D) -> void:
@@ -618,6 +670,7 @@ func check_nearby(other: CharacterBody2D) -> void:
 
 # --- FLEE (INT-006: personality-driven avoidance) ---
 func _enter_flee(other: CharacterBody2D) -> void:
+	show_emote("nervous")
 	state = State.WANDER
 	# Pick a point opposite to other agent's position
 	var away_dir: Vector2 = (position - other.position).normalized()
