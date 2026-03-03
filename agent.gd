@@ -159,7 +159,7 @@ func _ready() -> void:
 	var frames_path: String = "res://assets/sprites/agents/%s_frames.tres" % agent_name.to_lower()
 	if ResourceLoader.exists(frames_path):
 		anim_sprite.sprite_frames = load(frames_path)
-		anim_sprite.scale = Vector2(2.0, 2.0)  # 16px → 32px apparent
+		anim_sprite.scale = Vector2(1.0, 1.0)  # 16px = 1 tile
 		anim_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(anim_sprite)
 		sprite.visible = false
