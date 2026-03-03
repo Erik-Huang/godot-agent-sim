@@ -40,12 +40,14 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
 - ✅ NavigationRegion2D pathfinding with NavigationAgent2D (t-20260302-004)
 - ✅ Navmesh baked from TileMapLayer collision geometry (NAV-002) — replaces hardcoded INTERIOR_WALLS
 
+- ✅ LLM HTTP helper extracted (`_make_api_request`), importance rating routed through rate limiter (REFACTOR-001/BUG-001, t-20260303-003)
+
 **Known debt:**
 - `agent.gd` is a God Object (677 lines, 7+ responsibilities) — see REVIEW-2026-03-03.md
 - `PersonalityProfile` and `AgentDefinition` resources exist but are NOT wired — personality still uses match blocks in agent.gd
 - `main.gd` has 70 lines of manual UI reparenting in `_ready()`
 
-**Next task:** TBD
+**Next task:** t-20260303-004 (BUG-002/PERF-001: sim-time memory timestamps, throttle UI polling)
 
 ---
 
