@@ -83,16 +83,16 @@ func _ready() -> void:
 	name_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	# UI-001: Speech bubble styling
 	speech_bubble.visible = false
-	speech_bubble.custom_minimum_size = Vector2(80, 0)
-	speech_bubble.position = Vector2(-40, -60)
+	speech_bubble.custom_minimum_size = Vector2(100, 0)
+	speech_bubble.position = Vector2(-80, -80)
 	speech_bubble.z_index = 10
 	speech_bubble.z_as_relative = false
 	if ResourceLoader.exists("res://assets/ui/fonts/NormalFont.ttf"):
 		var font := load("res://assets/ui/fonts/NormalFont.ttf") as Font
-		speech_label.add_theme_font_override("font", font)
-		speech_label.add_theme_font_size_override("font_size", 13)
+		# speech_label.add_theme_font_override("font", font)
+		speech_label.add_theme_font_size_override("font_size", 8)
 	else:
-		speech_label.add_theme_font_size_override("font_size", 13)
+		speech_label.add_theme_font_size_override("font_size", 8)
 	speech_label.add_theme_color_override("font_color", Color.WHITE)
 
 	# Apply speed modifier based on personality

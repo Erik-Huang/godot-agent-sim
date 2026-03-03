@@ -79,7 +79,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	margin.add_theme_constant_override("margin_bottom", 4)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 1)
+	vbox.add_theme_constant_override("separation", 3)
 
 	# Header row: color dot + name [personality]
 	var header_row := HBoxContainer.new()
