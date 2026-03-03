@@ -130,6 +130,9 @@ func _ready() -> void:
 	var camera := Camera2D.new()
 	camera.name = "WorldCamera"
 	add_child(camera)
+	# Start zoomed in at map centre
+	camera.zoom = Vector2(2.0, 2.0)
+	camera.position = Vector2(960, 540)  # Centre of 1920x1080 map
 
 	# Wait one frame for navigation to bake
 	await get_tree().physics_frame
