@@ -387,7 +387,7 @@ func show_speech(text: String) -> void:
 	# GFX-003: Enrich bubble with last memory snippet
 	var display_text: String = text
 	if MemoryService:
-		var top_mems: Array = MemoryService.get_top_memories(agent_name, 1)
+		var top_mems: Array = MemoryService.get_top_memories(agent_name, 1, sim_time)  # BUG-002
 		if top_mems.size() > 0:
 			var snippet: String = top_mems[0]["text"]
 			if snippet.length() > 40:

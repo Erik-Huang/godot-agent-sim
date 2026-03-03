@@ -135,10 +135,11 @@ func _do_rate_importance_request(agent_name: String, text: String) -> void:
 	)
 
 # MEM-003: Format top memories as a text block for prompt injection
-func _format_memories_block(agent_name: String, n: int = 3) -> String:
+# BUG-002: Accept sim_time for sim-time-aware scoring
+func _format_memories_block(agent_name: String, n: int = 3, current_sim_time: float = -1.0) -> String:
 	if not MemoryService:
 		return ""
-	var memories: Array = MemoryService.get_top_memories(agent_name, n)
+	var memories: Array = MemoryService.get_top_memories(agent_name, n, current_sim_time)
 	if memories.size() == 0:
 		return ""
 	var lines: String = "Recent memories:\n"
@@ -176,7 +177,7 @@ func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 
 func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_key: String) -> void:
 	# MEM-003 + INT-002: Richer prompt with memory context
-	var memories_block: String = _format_memories_block(agent.agent_name, 3)
+	var memories_block: String = _format_memories_block(agent.agent_name, 3, agent.sim_time)  # BUG-002
 	# AUDIT-009: Default to "between areas" when zone string is empty
 	var zone_name: String = agent.current_zone if agent.current_zone != "" else "between areas"
 	var prompt_text: String = "You are %s, a %s person currently in the %s area.\n%sYou just encountered %s, who is %s.\nWrite ONE sentence (max 12 words) you would say to them. Reply with ONLY the sentence." % [
@@ -204,7 +205,7 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		# INT-003: Fallback observation on HTTP failure
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
-			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"])
+			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
 		return
 
 	var json: JSON = JSON.new()
@@ -216,7 +217,7 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		# INT-003: Fallback observation on parse failure
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
-			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"])
+			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
 		return
 
 	var data: Dictionary = json.data
@@ -233,8 +234,8 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
 			var obs_text: String = "I talked to %s near the %s. They said: '%s'" % [other.agent_name, zone_name, text]
-			MemoryService.add_observation(agent.agent_name, obs_text, 6, ["social", "interaction"])
-			MemoryService.add_observation(other.agent_name, "I was approached by %s in the %s" % [agent.agent_name, zone_name], 5, ["social"])
+			MemoryService.add_observation(agent.agent_name, obs_text, 6, ["social", "interaction"], agent.sim_time)  # BUG-002
+			MemoryService.add_observation(other.agent_name, "I was approached by %s in the %s" % [agent.agent_name, zone_name], 5, ["social"], other.sim_time)  # BUG-002
 			# MEM-004: Update social relationships (both directions)
 			MemoryService.update_relationship(agent.agent_name, other.agent_name, 0.1)
 			MemoryService.update_relationship(other.agent_name, agent.agent_name, 0.1)
@@ -245,7 +246,7 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		# INT-003: Fallback observation when LLM returns no choices
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
-			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"])
+			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
 
 
 # AUDIT-003: Generate a response for the interaction partner
@@ -278,7 +279,7 @@ func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D
 		_dispatch_next()
 		return
 
-	var memories_block: String = _format_memories_block(other.agent_name, 2)
+	var memories_block: String = _format_memories_block(other.agent_name, 2, other.sim_time)  # BUG-002
 	var prompt_text: String = "You are %s, a %s person.\n%s%s just said to you: \"%s\"\nWrite a SHORT reply (max 8 words). Reply with ONLY the sentence." % [
 		other.agent_name, other.personality, memories_block, agent.agent_name, initiator_text
 	]
@@ -302,7 +303,8 @@ func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D
 
 
 # MEM-005: Reflection synthesis — LLM generates insight from recent observations
-func request_reflection(agent_name: String) -> void:
+# BUG-002: Accept sim_time for sim-time-aware memory storage
+func request_reflection(agent_name: String, sim_time: float = -1.0) -> void:
 	var api_key: String = OS.get_environment("OPENAI_API_KEY")
 	if api_key == "":
 		return  # Reflections are non-critical; silently skip without API
@@ -312,10 +314,10 @@ func request_reflection(agent_name: String) -> void:
 		return
 
 	_dispatch_or_queue(func() -> void:
-		_do_reflection_request(agent_name, recent_obs)
+		_do_reflection_request(agent_name, recent_obs, sim_time)
 	)
 
-func _do_reflection_request(agent_name: String, recent_obs: Array) -> void:
+func _do_reflection_request(agent_name: String, recent_obs: Array, sim_time: float = -1.0) -> void:
 	var formatted_obs: String = ""
 	for obs in recent_obs:
 		formatted_obs += "- %s\n" % obs["text"]
@@ -338,7 +340,7 @@ func _do_reflection_request(agent_name: String, recent_obs: Array) -> void:
 					if data.has("choices") and data["choices"].size() > 0:
 						var insight_text: String = data["choices"][0]["message"]["content"].strip_edges()
 						if insight_text.length() > 0 and MemoryService:
-							MemoryService.add_observation(agent_name, insight_text, 8, ["reflection"])
+							MemoryService.add_observation(agent_name, insight_text, 8, ["reflection"], sim_time)  # BUG-002
 	)
 
 # INT-004: Daily agenda generation via LLM

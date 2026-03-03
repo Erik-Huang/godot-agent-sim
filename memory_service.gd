@@ -11,7 +11,7 @@ var relationships: Dictionary = {}
 # MEM-005: Reflection synthesis — tracks observations since last reflection per agent
 var reflection_counters: Dictionary = {}
 const REFLECTION_THRESHOLD: int = 15
-signal on_reflection_ready(agent_name: String)
+signal on_reflection_ready(agent_name: String, sim_time: float)  # BUG-002: added sim_time
 
 const MAX_OBSERVATIONS_PER_AGENT: int = 200
 const MEMORY_DIR: String = "user://memory/"
@@ -34,7 +34,8 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		save_memories()
 
-func add_observation(agent_name: String, text: String, importance: int = 5, tags: Array = []) -> void:
+# BUG-002: sim_time param (hours, e.g. 8.0 = 8am). -1.0 = use wall-clock fallback.
+func add_observation(agent_name: String, text: String, importance: int = 5, tags: Array = [], sim_time: float = -1.0) -> void:
 	if not observations.has(agent_name):
 		observations[agent_name] = []
 
@@ -44,6 +45,9 @@ func add_observation(agent_name: String, text: String, importance: int = 5, tags
 		"importance": clampi(importance, 1, 10),
 		"tags": tags,
 	}
+	# BUG-002: Store sim-time alongside wall-clock for recency decay
+	if sim_time >= 0.0:
+		entry["sim_time"] = sim_time
 	observations[agent_name].append(entry)
 
 	# MEM-005: Track observations for reflection synthesis
@@ -51,22 +55,22 @@ func add_observation(agent_name: String, text: String, importance: int = 5, tags
 		reflection_counters[agent_name] = 0
 	reflection_counters[agent_name] += 1
 	if reflection_counters[agent_name] >= REFLECTION_THRESHOLD:
-		on_reflection_ready.emit(agent_name)
+		on_reflection_ready.emit(agent_name, sim_time)  # BUG-002
 		reflection_counters[agent_name] = 0
 
 	# Evict lowest-score entry if over cap
 	if observations[agent_name].size() > MAX_OBSERVATIONS_PER_AGENT:
-		_evict_lowest(agent_name)
+		_evict_lowest(agent_name, sim_time)
 
-func get_top_memories(agent_name: String, n: int = 5) -> Array:
+# BUG-002: current_sim_time (hours). -1.0 = use wall-clock fallback.
+func get_top_memories(agent_name: String, n: int = 5, current_sim_time: float = -1.0) -> Array:
 	if not observations.has(agent_name):
 		return []
 
-	var now_sec: float = Time.get_unix_time_from_system()
 	var scored: Array = []
 
 	for obs in observations[agent_name]:
-		var score: float = _score_observation(obs, now_sec)
+		var score: float = _score_observation(obs, current_sim_time)
 		scored.append({"obs": obs, "score": score})
 
 	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["score"] > b["score"])
@@ -146,18 +150,25 @@ func load_memories() -> void:
 		file_name = dir.get_next()
 	dir.list_dir_end()
 
-func _score_observation(obs: Dictionary, now_sec: float) -> float:
-	var age_sec: float = now_sec - obs["timestamp_sec"]
+# BUG-002: Unified scoring with sim-time preference and wall-clock fallback.
+# current_sim_time in hours (-1.0 = use wall-clock).
+func _score_observation(obs: Dictionary, current_sim_time: float = -1.0) -> float:
+	var age_sec: float
+	if current_sim_time >= 0.0 and obs.has("sim_time"):
+		# Sim-time path: convert hours → seconds for consistent decay constant
+		age_sec = (current_sim_time - obs["sim_time"]) * 3600.0
+	else:
+		# Wall-clock fallback for legacy observations or unknown sim_time
+		age_sec = Time.get_unix_time_from_system() - obs["timestamp_sec"]
 	return 0.3 * exp(-age_sec / 3600.0) + 0.7 * obs["importance"]
 
-func _evict_lowest(agent_name: String) -> void:
-	var now_sec: float = Time.get_unix_time_from_system()
+func _evict_lowest(agent_name: String, current_sim_time: float = -1.0) -> void:
 	var lowest_score: float = INF
 	var lowest_idx: int = 0
 
 	for i in range(observations[agent_name].size()):
 		var obs: Dictionary = observations[agent_name][i]
-		var score: float = _score_observation(obs, now_sec)
+		var score: float = _score_observation(obs, current_sim_time)
 		if score < lowest_score:
 			lowest_score = score
 			lowest_idx = i

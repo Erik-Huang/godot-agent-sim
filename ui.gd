@@ -14,6 +14,13 @@ var _log_labels: Array[Label] = []
 
 func _ready() -> void:
 	_setup_panel_background()
+	# PERF-001: Poll agents on a 0.5s timer instead of every frame
+	var poll_timer := Timer.new()
+	poll_timer.name = "PollTimer"
+	poll_timer.wait_time = 0.5
+	poll_timer.autostart = true
+	add_child(poll_timer)
+	poll_timer.timeout.connect(_poll_agents)
 
 func _setup_panel_background() -> void:
 	# Apply background style directly on this panel node
@@ -137,8 +144,8 @@ func _apply_font(label: Label, size: int) -> void:
 func _apply_muted_color(label: Label) -> void:
 	label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
 
-func _process(_delta: float) -> void:
-	# Pull live data from all registered agents each frame
+# PERF-001: Polls on 0.5s timer instead of every frame
+func _poll_agents() -> void:
 	for agent in agent_refs:
 		if not is_instance_valid(agent):
 			continue
@@ -172,7 +179,7 @@ func _process(_delta: float) -> void:
 		_update_mood_bar(card["mood_bar_fill"], avg_sentiment)
 
 		# Last memory
-		var top_mems: Array = MemoryService.get_top_memories(aname, 1)
+		var top_mems: Array = MemoryService.get_top_memories(aname, 1, agent.sim_time)  # BUG-002
 		if top_mems.size() > 0:
 			var snippet: String = top_mems[0].get("text", "")
 			if snippet.length() > 40:
