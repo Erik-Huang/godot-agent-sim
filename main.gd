@@ -210,7 +210,7 @@ func _spawn_agents() -> void:
 		agent.state_changed.connect(_on_agent_state_changed)
 		agent_container.add_child(agent)
 		agents.append(agent)
-		ui_panel.register_agent(data["name"], data["personality"])
+		ui_panel.register_agent(agent)
 	# AUDIT-011: Register agent names for dynamic importance heuristic
 	LlmDialogue.register_agents(agents.map(func(a): return a.agent_name.to_lower()))
 
