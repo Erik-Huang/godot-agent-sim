@@ -49,7 +49,7 @@ func _ready() -> void:
 	# AUDIT-015: randomize() removed — auto-called in Godot 4
 	_setup_navigation()
 	_setup_wall_shapes()
-	_setup_zone_visuals()
+	# _setup_zone_visuals()  # Disabled: replaced by TileMapLayer visual map
 	# DBG-001: Main processes during pause (for input); agents pause via their container
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	agent_container.process_mode = Node.PROCESS_MODE_PAUSABLE
