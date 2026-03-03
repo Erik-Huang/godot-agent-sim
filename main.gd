@@ -41,6 +41,11 @@ var zone_rects: Dictionary = {
 # FIX-002: CanvasLayer for UI overlay
 var ui_layer: CanvasLayer
 
+# FIX-003: Camera zoom/pan state
+var _is_dragging: bool = false
+var _drag_start: Vector2 = Vector2.ZERO
+var _camera_start: Vector2 = Vector2.ZERO
+
 # GFX-004: Zone color tints
 var zone_colors: Dictionary = {
 	"park": Color(0.2, 0.8, 0.2, 0.06),
@@ -121,9 +126,41 @@ func _ready() -> void:
 	# MEM-005: Connect reflection signal to LLM reflection handler
 	MemoryService.on_reflection_ready.connect(_on_reflection_ready)
 
+	# FIX-003: Camera2D for zoom/pan
+	var camera := Camera2D.new()
+	camera.name = "WorldCamera"
+	add_child(camera)
+
 	# Wait one frame for navigation to bake
 	await get_tree().physics_frame
 	_spawn_agents()
+
+# FIX-003: Camera zoom/pan input
+func _unhandled_input(event: InputEvent) -> void:
+	var camera: Camera2D = get_node_or_null("WorldCamera")
+	if camera == null:
+		return
+
+	if event is InputEventMouseButton:
+		# Mouse wheel zoom
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			camera.zoom = (camera.zoom * 1.1).clamp(Vector2(0.5, 0.5), Vector2(3.0, 3.0))
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			camera.zoom = (camera.zoom / 1.1).clamp(Vector2(0.5, 0.5), Vector2(3.0, 3.0))
+		# Left click drag start
+		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			_is_dragging = true
+			_drag_start = event.position
+			_camera_start = camera.position
+		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			_is_dragging = false
+
+	# Drag pan
+	if event is InputEventMouseMotion and _is_dragging:
+		var camera2: Camera2D = get_node_or_null("WorldCamera")
+		if camera2:
+			var delta_pos: Vector2 = (event.position - _drag_start) / camera2.zoom
+			camera2.position = _camera_start - delta_pos
 
 # DBG-001: Spacebar pause toggle + GFX-005: Time-of-day
 func _process(delta: float) -> void:
