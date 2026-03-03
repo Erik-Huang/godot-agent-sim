@@ -4,11 +4,8 @@ extends VBoxContainer
 
 const PANEL_TEXTURE_PATH := "res://assets/ui/theme/nine_path_panel.png"
 const BG_TEXTURE_PATH := "res://assets/ui/theme/nine_path_bg.png"
-const FONT_PATH := "res://assets/ui/fonts/NormalFont.ttf"
-
 var agent_cards: Dictionary = {}  # agent_name → Dictionary of UI nodes
 var agent_refs: Array = []  # CharacterBody2D references for live polling
-var pixel_font: Font = null
 var panel_texture: Texture2D = null
 var bg_texture: Texture2D = null
 
@@ -17,11 +14,9 @@ const MAX_LOG_ENTRIES: int = 8
 var _log_labels: Array[Label] = []
 
 @onready var agent_list: VBoxContainer = $AgentScroll/AgentList
-@onready var log_list: VBoxContainer = $LogList
+@onready var log_list: VBoxContainer = $LogScroll/LogList
 
 func _ready() -> void:
-	if ResourceLoader.exists(FONT_PATH):
-		pixel_font = load(FONT_PATH) as Font
 	if ResourceLoader.exists(PANEL_TEXTURE_PATH):
 		panel_texture = load(PANEL_TEXTURE_PATH) as Texture2D
 	if ResourceLoader.exists(BG_TEXTURE_PATH):
@@ -33,16 +28,6 @@ func _setup_panel_background() -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.08, 0.09, 0.12, 1.0)
 	add_theme_stylebox_override("panel", sb)
-	# Style title and headers with pixel font
-	var title: Label = get_node_or_null("Title")
-	if title and pixel_font:
-		title.add_theme_font_override("font", pixel_font)
-	var agents_header: Label = get_node_or_null("AgentsHeader")
-	if agents_header and pixel_font:
-		agents_header.add_theme_font_override("font", pixel_font)
-	var log_header: Label = get_node_or_null("LogHeader")
-	if log_header and pixel_font:
-		log_header.add_theme_font_override("font", pixel_font)
 
 func register_agent(agent: CharacterBody2D) -> void:
 	agent_refs.append(agent)
@@ -164,8 +149,6 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	}
 
 func _apply_font(label: Label, size: int) -> void:
-	if pixel_font:
-		label.add_theme_font_override("font", pixel_font)
 	label.add_theme_font_size_override("font_size", size)
 
 func _apply_muted_color(label: Label) -> void:
