@@ -38,6 +38,9 @@ var zone_rects: Dictionary = {
 @onready var ui_panel: VBoxContainer = $UIPanel
 @onready var nav_region: NavigationRegion2D = $NavigationRegion2D
 
+# FIX-002: CanvasLayer for UI overlay
+var ui_layer: CanvasLayer
+
 # GFX-004: Zone color tints
 var zone_colors: Dictionary = {
 	"park": Color(0.2, 0.8, 0.2, 0.06),
@@ -74,6 +77,23 @@ func _ready() -> void:
 	add_child(pause_label)
 	# DBG-001: UIPanel stays responsive while paused
 	ui_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# FIX-002: Move UI panel into a CanvasLayer overlay (right 20% of screen)
+	ui_layer = CanvasLayer.new()
+	ui_layer.layer = 10
+	ui_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(ui_layer)
+	ui_panel.get_parent().remove_child(ui_panel)
+	ui_layer.add_child(ui_panel)
+	# Anchor to right 20% of viewport
+	ui_panel.anchor_left = 0.8
+	ui_panel.anchor_right = 1.0
+	ui_panel.anchor_top = 0.0
+	ui_panel.anchor_bottom = 1.0
+	ui_panel.offset_left = 0
+	ui_panel.offset_right = 0
+	ui_panel.offset_top = 0
+	ui_panel.offset_bottom = 0
 
 	# GFX-005: CanvasModulate for time-of-day lighting
 	canvas_mod = CanvasModulate.new()
