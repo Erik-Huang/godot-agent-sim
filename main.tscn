@@ -103,7 +103,6 @@ offset_bottom = 800.0
 script = ExtResource("2")
 
 [node name="UIBackground" type="ColorRect" parent="UIPanel" unique_id=2005027653]
-custom_minimum_size = Vector2(250, 800)
 layout_mode = 2
 color = Color(0.08, 0.09, 0.12, 1)
 

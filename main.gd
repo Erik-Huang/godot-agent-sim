@@ -119,13 +119,6 @@ func _ready() -> void:
 	ui_panel.offset_bottom = 0.0
 	ui_panel.clip_contents = true
 
-	# Fix UIBackground — remove hardcoded size so it fills naturally
-	var ui_bg: ColorRect = ui_panel.get_node_or_null("UIBackground")
-	if ui_bg:
-		ui_bg.custom_minimum_size = Vector2.ZERO
-		ui_bg.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		ui_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
 	# Wrap AgentList in ScrollContainer so cards don't overflow
 	var agent_list_node: VBoxContainer = ui_panel.get_node_or_null("AgentList")
 	if agent_list_node:
@@ -140,6 +133,20 @@ func _ready() -> void:
 		al_parent.move_child(scroll, al_idx)
 		scroll.add_child(agent_list_node)
 		agent_list_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# Fix UIBackground: move it OUT of VBoxContainer so it's a real backdrop
+	var ui_bg: ColorRect = ui_panel.get_node_or_null("UIBackground")
+	if ui_bg:
+		ui_panel.remove_child(ui_bg)
+		outer_panel.add_child(ui_bg)
+		outer_panel.move_child(ui_bg, 0)  # Draw behind everything
+		ui_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ui_bg.offset_left = 0.0
+		ui_bg.offset_right = 0.0
+		ui_bg.offset_top = 0.0
+		ui_bg.offset_bottom = 0.0
+		ui_bg.custom_minimum_size = Vector2.ZERO
+		ui_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# GFX-005: CanvasModulate for time-of-day lighting
 	canvas_mod = CanvasModulate.new()
