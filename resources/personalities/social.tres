@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PersonalityProfile" load_steps=2 format=3 uid="uid://d7q2u4w6y8a3"]
+
+[ext_resource type="Script" uid="uid://lkanoiyjm86x" path="res://resources/personality_profile.gd" id="1_soc"]
+
+[resource]
+script = ExtResource("1_soc")
+id = "social"
+speed_modifier = 1.08
+seek_chance = 0.7
+approach_tendency = 0.8
+wander_pause_min = 1.0
+wander_pause_max = 2.0
+llm_prompt_fragment = "You are outgoing and social, always looking for people to talk to."

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PersonalityProfile" load_steps=2 format=3 uid="uid://b3k7m9p2x4q1"]
+
+[ext_resource type="Script" uid="uid://lkanoiyjm86x" path="res://resources/personality_profile.gd" id="1_cur"]
+
+[resource]
+script = ExtResource("1_cur")
+id = "curious"
+speed_modifier = 1.0
+seek_chance = 0.5
+approach_tendency = 0.2
+wander_pause_min = 1.5
+wander_pause_max = 3.0
+llm_prompt_fragment = "You are curious and exploratory, always looking for interesting things to observe."

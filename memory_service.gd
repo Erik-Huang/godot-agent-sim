@@ -66,8 +66,7 @@ func get_top_memories(agent_name: String, n: int = 5) -> Array:
 	var scored: Array = []
 
 	for obs in observations[agent_name]:
-		var age_sec: float = now_sec - obs["timestamp_sec"]
-		var score: float = 0.3 * exp(-age_sec / 3600.0) + 0.7 * obs["importance"]
+		var score: float = _score_observation(obs, now_sec)
 		scored.append({"obs": obs, "score": score})
 
 	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["score"] > b["score"])
@@ -147,6 +146,10 @@ func load_memories() -> void:
 		file_name = dir.get_next()
 	dir.list_dir_end()
 
+func _score_observation(obs: Dictionary, now_sec: float) -> float:
+	var age_sec: float = now_sec - obs["timestamp_sec"]
+	return 0.3 * exp(-age_sec / 3600.0) + 0.7 * obs["importance"]
+
 func _evict_lowest(agent_name: String) -> void:
 	var now_sec: float = Time.get_unix_time_from_system()
 	var lowest_score: float = INF
@@ -154,8 +157,7 @@ func _evict_lowest(agent_name: String) -> void:
 
 	for i in range(observations[agent_name].size()):
 		var obs: Dictionary = observations[agent_name][i]
-		var age_sec: float = now_sec - obs["timestamp_sec"]
-		var score: float = 0.3 * exp(-age_sec / 3600.0) + 0.7 * obs["importance"]
+		var score: float = _score_observation(obs, now_sec)
 		if score < lowest_score:
 			lowest_score = score
 			lowest_idx = i

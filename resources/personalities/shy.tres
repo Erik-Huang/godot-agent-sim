@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PersonalityProfile" load_steps=2 format=3 uid="uid://c5n8r1t3v6w2"]
+
+[ext_resource type="Script" uid="uid://lkanoiyjm86x" path="res://resources/personality_profile.gd" id="1_shy"]
+
+[resource]
+script = ExtResource("1_shy")
+id = "shy"
+speed_modifier = 0.83
+seek_chance = 0.1
+approach_tendency = -0.5
+wander_pause_min = 3.0
+wander_pause_max = 5.0
+llm_prompt_fragment = "You are shy and reserved, preferring quiet corners and avoiding crowds."

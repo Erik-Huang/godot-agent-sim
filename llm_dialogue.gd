@@ -43,6 +43,39 @@ func _dispatch_next() -> void:
 		_active_requests += 1
 		next.call()
 
+# P0: Unified HTTP helper — creates HTTPRequest, sends to OpenAI, dispatches next on completion
+func _make_api_request(messages: Array, max_tokens: int, temperature: float, on_complete: Callable) -> void:
+	var api_key: String = OS.get_environment("OPENAI_API_KEY")
+	var http: HTTPRequest = HTTPRequest.new()
+	add_child(http)
+
+	var body: Dictionary = {
+		"model": "gpt-4o-mini",
+		"messages": messages,
+		"max_tokens": max_tokens,
+		"temperature": temperature,
+	}
+
+	var headers: PackedStringArray = PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Bearer %s" % api_key,
+	])
+
+	var json_body: String = JSON.stringify(body)
+
+	http.request_completed.connect(
+		func(result: int, response_code: int, resp_headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
+			on_complete.call(result, response_code, resp_headers, body_bytes)
+			_dispatch_next()
+			http.queue_free()
+	)
+
+	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
+	if err != OK:
+		on_complete.call(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedStringArray(), PackedByteArray())
+		_dispatch_next()
+		http.queue_free()
+
 # MEM-002: Importance scoring
 # Returns an importance rating 1-10 for an observation text.
 # Uses heuristics if no API key; async LLM call otherwise (fire-and-forget update).
@@ -53,7 +86,7 @@ func rate_importance(agent_name: String, text: String) -> int:
 
 	# Fire async LLM call to rate importance; return heuristic for now
 	var initial: int = _heuristic_importance(text)
-	_async_rate_importance(agent_name, text, api_key)
+	_async_rate_importance(agent_name, text)
 	return initial
 
 func _heuristic_importance(text: String) -> int:
@@ -70,30 +103,21 @@ func _heuristic_importance(text: String) -> int:
 		return 3
 	return 4
 
-func _async_rate_importance(agent_name: String, text: String, api_key: String) -> void:
-	var http: HTTPRequest = HTTPRequest.new()
-	add_child(http)
+# P0: Now routed through _dispatch_or_queue for rate limiting
+func _async_rate_importance(agent_name: String, text: String) -> void:
+	_dispatch_or_queue(func() -> void:
+		_do_rate_importance_request(agent_name, text)
+	)
 
+func _do_rate_importance_request(agent_name: String, text: String) -> void:
 	var prompt_text: String = "Rate 1-10 how significant this event is for %s: '%s'. Reply with only a number." % [agent_name, text]
 
-	var body: Dictionary = {
-		"model": "gpt-4o-mini",
-		"messages": [
-			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
-			{"role": "user", "content": prompt_text}
-		],
-		"max_tokens": 5,
-		"temperature": 0.0,
-	}
+	var messages: Array = [
+		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "user", "content": prompt_text}
+	]
 
-	var headers: PackedStringArray = PackedStringArray([
-		"Content-Type: application/json",
-		"Authorization: Bearer %s" % api_key,
-	])
-
-	var json_body: String = JSON.stringify(body)
-
-	http.request_completed.connect(
+	_make_api_request(messages, 5, 0.0,
 		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
 			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
 				var json := JSON.new()
@@ -108,12 +132,7 @@ func _async_rate_importance(agent_name: String, text: String, api_key: String) -
 								if obs["text"] == text:
 									obs["importance"] = rating
 									break
-			http.queue_free()
 	)
-
-	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
-	if err != OK:
-		http.queue_free()
 
 # MEM-003: Format top memories as a text block for prompt injection
 func _format_memories_block(agent_name: String, n: int = 3) -> String:
@@ -152,14 +171,10 @@ func request_dialogue(agent: CharacterBody2D, other: CharacterBody2D) -> void:
 
 	# AUDIT-007: Queue the HTTP dispatch for rate limiting
 	_dispatch_or_queue(func() -> void:
-		_do_dialogue_request(agent, other, cache_key, api_key)
+		_do_dialogue_request(agent, other, cache_key)
 	)
 
-func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_key: String, api_key: String) -> void:
-	# Create HTTP request
-	var http: HTTPRequest = HTTPRequest.new()
-	add_child(http)
-
+func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_key: String) -> void:
 	# MEM-003 + INT-002: Richer prompt with memory context
 	var memories_block: String = _format_memories_block(agent.agent_name, 3)
 	# AUDIT-009: Default to "between areas" when zone string is empty
@@ -168,39 +183,15 @@ func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_
 		agent.agent_name, agent.personality, zone_name, memories_block, other.agent_name, other.personality
 	]
 
-	var body: Dictionary = {
-		"model": "gpt-4o-mini",
-		"messages": [
-			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
-			{"role": "user", "content": prompt_text}
-		],
-		"max_tokens": 50,
-		"temperature": 0.8,
-	}
+	var messages: Array = [
+		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "user", "content": prompt_text}
+	]
 
-	var headers: PackedStringArray = PackedStringArray([
-		"Content-Type: application/json",
-		"Authorization: Bearer %s" % api_key,
-	])
-
-	var json_body: String = JSON.stringify(body)
-
-	# Connect callback with agent references
-	http.request_completed.connect(
+	_make_api_request(messages, 50, 0.8,
 		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
 			_on_request_completed(result, response_code, body_bytes, agent, other, cache_key)
-			# AUDIT-007: Dispatch next queued request
-			_dispatch_next()
-			http.queue_free()
 	)
-
-	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
-	if err != OK:
-		var fallback: String = _get_fallback(agent.personality)
-		agent.show_speech(fallback)
-		agent.interaction_started.emit(agent.agent_name, other.agent_name, fallback)
-		_dispatch_next()
-		http.queue_free()
 
 func _on_request_completed(result: int, response_code: int, body_bytes: PackedByteArray, agent: CharacterBody2D, other: CharacterBody2D, cache_key: String) -> void:
 	if not is_instance_valid(agent):
@@ -278,41 +269,26 @@ func _generate_partner_response(agent: CharacterBody2D, other: CharacterBody2D, 
 		return
 
 	_dispatch_or_queue(func() -> void:
-		_do_partner_response_request(agent, other, initiator_text, api_key)
+		_do_partner_response_request(agent, other, initiator_text)
 	)
 
 # AUDIT-017: Extracted HTTP dispatch for partner response (called via queue)
-func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D, initiator_text: String, api_key: String) -> void:
+func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D, initiator_text: String) -> void:
 	if not is_instance_valid(other):
 		_dispatch_next()
 		return
-
-	var http: HTTPRequest = HTTPRequest.new()
-	add_child(http)
 
 	var memories_block: String = _format_memories_block(other.agent_name, 2)
 	var prompt_text: String = "You are %s, a %s person.\n%s%s just said to you: \"%s\"\nWrite a SHORT reply (max 8 words). Reply with ONLY the sentence." % [
 		other.agent_name, other.personality, memories_block, agent.agent_name, initiator_text
 	]
 
-	var body: Dictionary = {
-		"model": "gpt-4o-mini",
-		"messages": [
-			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
-			{"role": "user", "content": prompt_text}
-		],
-		"max_tokens": 30,
-		"temperature": 0.8,
-	}
+	var messages: Array = [
+		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "user", "content": prompt_text}
+	]
 
-	var headers: PackedStringArray = PackedStringArray([
-		"Content-Type: application/json",
-		"Authorization: Bearer %s" % api_key,
-	])
-
-	var json_body: String = JSON.stringify(body)
-
-	http.request_completed.connect(
+	_make_api_request(messages, 30, 0.8,
 		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
 			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
 				var json := JSON.new()
@@ -322,14 +298,7 @@ func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D
 						var reply_text: String = data["choices"][0]["message"]["content"].strip_edges()
 						if is_instance_valid(other):
 							other.show_speech(reply_text)
-			_dispatch_next()
-			http.queue_free()
 	)
-
-	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
-	if err != OK:
-		_dispatch_next()
-		http.queue_free()
 
 
 # MEM-005: Reflection synthesis — LLM generates insight from recent observations
@@ -343,13 +312,10 @@ func request_reflection(agent_name: String) -> void:
 		return
 
 	_dispatch_or_queue(func() -> void:
-		_do_reflection_request(agent_name, recent_obs, api_key)
+		_do_reflection_request(agent_name, recent_obs)
 	)
 
-func _do_reflection_request(agent_name: String, recent_obs: Array, api_key: String) -> void:
-	var http: HTTPRequest = HTTPRequest.new()
-	add_child(http)
-
+func _do_reflection_request(agent_name: String, recent_obs: Array) -> void:
 	var formatted_obs: String = ""
 	for obs in recent_obs:
 		formatted_obs += "- %s\n" % obs["text"]
@@ -358,24 +324,12 @@ func _do_reflection_request(agent_name: String, recent_obs: Array, api_key: Stri
 		agent_name, formatted_obs, agent_name
 	]
 
-	var body: Dictionary = {
-		"model": "gpt-4o-mini",
-		"messages": [
-			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
-			{"role": "user", "content": prompt_text}
-		],
-		"max_tokens": 80,
-		"temperature": 0.7,
-	}
+	var messages: Array = [
+		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "user", "content": prompt_text}
+	]
 
-	var headers: PackedStringArray = PackedStringArray([
-		"Content-Type: application/json",
-		"Authorization: Bearer %s" % api_key,
-	])
-
-	var json_body: String = JSON.stringify(body)
-
-	http.request_completed.connect(
+	_make_api_request(messages, 80, 0.7,
 		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
 			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
 				var json := JSON.new()
@@ -385,14 +339,7 @@ func _do_reflection_request(agent_name: String, recent_obs: Array, api_key: Stri
 						var insight_text: String = data["choices"][0]["message"]["content"].strip_edges()
 						if insight_text.length() > 0 and MemoryService:
 							MemoryService.add_observation(agent_name, insight_text, 8, ["reflection"])
-			_dispatch_next()
-			http.queue_free()
 	)
-
-	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
-	if err != OK:
-		_dispatch_next()
-		http.queue_free()
 
 # INT-004: Daily agenda generation via LLM
 func request_agenda(agent_name: String, personality: String, backstory: String, callback: Callable) -> void:
@@ -402,37 +349,23 @@ func request_agenda(agent_name: String, personality: String, backstory: String, 
 		return
 
 	_dispatch_or_queue(func() -> void:
-		_do_agenda_request(agent_name, personality, backstory, api_key, callback)
+		_do_agenda_request(agent_name, personality, backstory, callback)
 	)
 
-func _do_agenda_request(agent_name: String, personality: String, backstory: String, api_key: String, callback: Callable) -> void:
-	var http: HTTPRequest = HTTPRequest.new()
-	add_child(http)
-
+func _do_agenda_request(agent_name: String, personality: String, backstory: String, callback: Callable) -> void:
 	var backstory_line: String = " %s" % backstory if backstory != "" else ""
 	var prompt_text: String = "You are %s, a %s person.%s\nIt's morning in a small town with a park, cafe, and town square.\nWrite a simple daily plan: 3-4 short activities with locations.\nFormat EXACTLY as: activity|zone (one per line, zone must be: park, cafe, or town_square)\nExample:\nmorning coffee|cafe\nread in the park|park\nchat with friends|town_square" % [
 		agent_name, personality, backstory_line
 	]
 
-	var body: Dictionary = {
-		"model": "gpt-4o-mini",
-		"messages": [
-			{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
-			{"role": "user", "content": prompt_text}
-		],
-		"max_tokens": 80,
-		"temperature": 0.8,
-	}
+	var messages: Array = [
+		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "user", "content": prompt_text}
+	]
 
-	var headers: PackedStringArray = PackedStringArray([
-		"Content-Type: application/json",
-		"Authorization: Bearer %s" % api_key,
-	])
-
-	var json_body: String = JSON.stringify(body)
 	var valid_zones: Array = ["park", "cafe", "town_square"]
 
-	http.request_completed.connect(
+	_make_api_request(messages, 80, 0.8,
 		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
 			var items: Array = []
 			if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
@@ -453,12 +386,4 @@ func _do_agenda_request(agent_name: String, personality: String, backstory: Stri
 								if zone in valid_zones and activity.length() > 0:
 									items.append({"activity": activity, "zone": zone, "done": false})
 			callback.call(items)
-			_dispatch_next()
-			http.queue_free()
 	)
-
-	var err: int = http.request("https://api.openai.com/v1/chat/completions", headers, HTTPClient.METHOD_POST, json_body)
-	if err != OK:
-		callback.call([])
-		_dispatch_next()
-		http.queue_free()

@@ -21,6 +21,7 @@ var interact_partner: CharacterBody2D = null
 var detection_area: Area2D = null
 var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
+var profile: PersonalityProfile
 var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
 
 # GFX-006: AnimatedSprite2D for Ninja Adventure sprites
@@ -53,6 +54,16 @@ var last_speech_text: String = ""
 # UI-002: Emote icon system
 var emote_icon: TextureRect = null
 var emote_textures: Dictionary = {}
+
+const DETECTION_RADIUS: float = 80.0
+const INTERACT_DISTANCE: float = 40.0
+const SEEK_ABANDON_DISTANCE: float = 200.0
+const INTERACT_DURATION: float = 5.0
+const INTERACTION_COOLDOWN: float = 5.0
+const SPEECH_DURATION: float = 4.0
+const FLEE_DISTANCE: float = 60.0
+const FLEE_COOLDOWN: float = 8.0
+const BASE_SPEED: float = 60.0
 
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
 @onready var sprite: Sprite2D = $Sprite2D
@@ -95,40 +106,16 @@ func _ready() -> void:
 		speech_label.add_theme_font_size_override("font_size", 8)
 	speech_label.add_theme_color_override("font_color", Color.WHITE)
 
-	# Apply speed modifier based on personality
-	# TODO (ARCH-003): replace match blocks with PersonalityProfile resource once .tres files created
-	match personality:
-		"lazy":
-			speed = 30.0
-		"wanderer":
-			speed = 85.0
-		"shy":
-			speed = 50.0
-		"curious":
-			speed = 60.0
-		"social":
-			speed = 65.0
-
-	# INT-006: Personality-driven approach/flee tendencies
-	match personality:
-		"social":
-			seek_chance = 0.7
-			approach_tendency = 0.8
-		"shy":
-			seek_chance = 0.1
-			approach_tendency = -0.5
-		"curious":
-			seek_chance = 0.5
-			approach_tendency = 0.2
-		"wanderer":
-			seek_chance = 0.2
-			approach_tendency = 0.0
-		"lazy":
-			seek_chance = 0.15
-			approach_tendency = -0.1
-		_:
-			seek_chance = 0.3
-			approach_tendency = 0.0
+	# ARCH-003: Load PersonalityProfile resource
+	var profile_path := "res://resources/personalities/%s.tres" % personality
+	if ResourceLoader.exists(profile_path):
+		profile = load(profile_path)
+	else:
+		push_warning("No PersonalityProfile found for '%s', using defaults" % personality)
+		profile = PersonalityProfile.new()
+	speed = BASE_SPEED * profile.speed_modifier
+	seek_chance = profile.seek_chance
+	approach_tendency = profile.approach_tendency
 
 	# Start in IDLE
 	_enter_idle()
@@ -137,7 +124,7 @@ func _ready() -> void:
 	var detection_area := Area2D.new()
 	var cshape := CollisionShape2D.new()
 	var circle := CircleShape2D.new()
-	circle.radius = 80.0
+	circle.radius = DETECTION_RADIUS
 	cshape.shape = circle
 	detection_area.add_child(cshape)
 	detection_area.monitoring = true
@@ -348,7 +335,7 @@ func _process_seek(_delta: float) -> void:
 	if dist < 35.0:
 		_enter_interact(seek_target)
 		return
-	if dist > 200.0:
+	if dist > SEEK_ABANDON_DISTANCE:
 		_enter_wander()
 		return
 	_move_toward_nav_target()
@@ -356,8 +343,8 @@ func _process_seek(_delta: float) -> void:
 # --- INTERACT ---
 func _enter_interact(other: CharacterBody2D) -> void:
 	state = State.INTERACT
-	interact_timer = 5.0
-	interaction_cooldown = 5.0
+	interact_timer = INTERACT_DURATION
+	interaction_cooldown = INTERACTION_COOLDOWN
 	velocity = Vector2.ZERO
 	interact_partner = other
 	show_action_text("Chatting...")
@@ -381,8 +368,8 @@ func receive_interaction(initiator: CharacterBody2D) -> void:
 	if state == State.INTERACT or state == State.SEEK:
 		return
 	interact_partner = initiator
-	interact_timer = 5.0
-	interaction_cooldown = 5.0
+	interact_timer = INTERACT_DURATION
+	interaction_cooldown = INTERACTION_COOLDOWN
 	velocity = Vector2.ZERO
 	state = State.INTERACT
 	state_changed.emit(agent_name, "interact")
@@ -413,7 +400,7 @@ func show_speech(text: String) -> void:
 			display_text += "\n" + snippet
 	speech_label.text = display_text
 	speech_bubble.visible = true
-	speech_timer = 4.0
+	speech_timer = SPEECH_DURATION
 
 # --- MOVING_TO_ZONE ---
 func _enter_moving_to_zone() -> void:
@@ -648,7 +635,7 @@ func check_nearby(other: CharacterBody2D) -> void:
 	if interaction_cooldown > 0.0:
 		return
 	var dist: float = position.distance_to(other.position)
-	if dist < 80.0 and other.interaction_cooldown <= 0.0 and other.state != State.INTERACT:
+	if dist < DETECTION_RADIUS and other.interaction_cooldown <= 0.0 and other.state != State.INTERACT:
 		# AUDIT-002: Record that we rolled for this agent (pass or fail)
 		_rolled_for[other.agent_name] = true
 		# MEM-004: Adjust seek chance by social sentiment

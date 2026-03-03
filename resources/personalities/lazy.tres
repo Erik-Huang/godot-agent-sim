@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PersonalityProfile" load_steps=2 format=3 uid="uid://g2u5a7c9e1f4"]
+
+[ext_resource type="Script" uid="uid://lkanoiyjm86x" path="res://resources/personality_profile.gd" id="1_laz"]
+
+[resource]
+script = ExtResource("1_laz")
+id = "lazy"
+speed_modifier = 0.5
+seek_chance = 0.15
+approach_tendency = -0.1
+wander_pause_min = 4.0
+wander_pause_max = 7.0
+llm_prompt_fragment = "You are laid-back and lazy, preferring to relax and take things slow."

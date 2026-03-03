@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PersonalityProfile" load_steps=2 format=3 uid="uid://f9s4x6z8b1d5"]
+
+[ext_resource type="Script" uid="uid://lkanoiyjm86x" path="res://resources/personality_profile.gd" id="1_wan"]
+
+[resource]
+script = ExtResource("1_wan")
+id = "wanderer"
+speed_modifier = 1.42
+seek_chance = 0.2
+approach_tendency = 0.0
+wander_pause_min = 0.5
+wander_pause_max = 1.5
+llm_prompt_fragment = "You are a restless wanderer, always on the move and exploring new paths."
