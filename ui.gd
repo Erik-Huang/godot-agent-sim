@@ -2,12 +2,8 @@ extends VBoxContainer
 
 # UI-003: Rich per-agent card panel with live state updates
 
-const PANEL_TEXTURE_PATH := "res://assets/ui/theme/nine_path_panel.png"
-const BG_TEXTURE_PATH := "res://assets/ui/theme/nine_path_bg.png"
 var agent_cards: Dictionary = {}  # agent_name → Dictionary of UI nodes
 var agent_refs: Array = []  # CharacterBody2D references for live polling
-var panel_texture: Texture2D = null
-var bg_texture: Texture2D = null
 
 var log_entries: Array[String] = []
 const MAX_LOG_ENTRIES: int = 8
@@ -17,10 +13,6 @@ var _log_labels: Array[Label] = []
 @onready var log_list: VBoxContainer = $LogScroll/LogList
 
 func _ready() -> void:
-	if ResourceLoader.exists(PANEL_TEXTURE_PATH):
-		panel_texture = load(PANEL_TEXTURE_PATH) as Texture2D
-	if ResourceLoader.exists(BG_TEXTURE_PATH):
-		bg_texture = load(BG_TEXTURE_PATH) as Texture2D
 	_setup_panel_background()
 
 func _setup_panel_background() -> void:
@@ -35,26 +27,17 @@ func register_agent(agent: CharacterBody2D) -> void:
 	agent_cards[agent.agent_name] = card
 
 func _create_agent_card(agent_name: String, personality_tag: String, agent_color: Color) -> Dictionary:
-	# Card container — PanelContainer with texture or flat fallback
+	# Card container — flat styled PanelContainer, no external assets
 	var card := PanelContainer.new()
 	card.name = "Card_%s" % agent_name
-	if panel_texture:
-		var sb := StyleBoxTexture.new()
-		sb.texture = panel_texture
-		sb.texture_margin_left = 4
-		sb.texture_margin_right = 4
-		sb.texture_margin_top = 4
-		sb.texture_margin_bottom = 4
-		card.add_theme_stylebox_override("panel", sb)
-	else:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.1, 0.12, 0.15, 0.9)
-		sb.border_width_left = 1
-		sb.border_width_right = 1
-		sb.border_width_top = 1
-		sb.border_width_bottom = 1
-		sb.border_color = Color(0.3, 0.35, 0.4, 0.5)
-		card.add_theme_stylebox_override("panel", sb)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.1, 0.12, 0.15, 0.9)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 1
+	sb.border_color = Color(0.3, 0.35, 0.4, 0.5)
+	card.add_theme_stylebox_override("panel", sb)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Margin inside card
