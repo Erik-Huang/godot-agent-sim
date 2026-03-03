@@ -5,14 +5,8 @@ const AgentScene: PackedScene = preload("res://agent.tscn")
 # AUDIT-012: Centralised world bounds
 const WORLD_BOUNDS := Rect2(10, 10, 1180, 780)
 
-# TODO: replace with @export var roster: Array[AgentDefinition] once .tres files created
-var agent_data: Array[Dictionary] = [
-	{"name": "Alice", "personality": "curious", "color": Color(0.3, 0.8, 1.0)},
-	{"name": "Bob", "personality": "shy", "color": Color(0.6, 0.4, 0.9)},
-	{"name": "Carol", "personality": "social", "color": Color(1.0, 0.5, 0.3)},
-	{"name": "Dave", "personality": "wanderer", "color": Color(0.3, 0.9, 0.4)},
-	{"name": "Eve", "personality": "lazy", "color": Color(0.9, 0.3, 0.6)},
-]
+# ARCH-004: AgentRoster resource — set via inspector or loaded from default
+@export var roster: AgentRoster
 
 var agents: Array = []
 
@@ -54,6 +48,9 @@ var zone_colors: Dictionary = {
 }
 
 func _ready() -> void:
+	# ARCH-004: Load default roster if not set via inspector
+	if roster == null:
+		roster = load("res://resources/default_roster.tres")
 	# AUDIT-015: randomize() removed — auto-called in Godot 4
 	_setup_navigation()
 	_setup_wall_shapes()
@@ -311,13 +308,15 @@ func _spawn_agents() -> void:
 		Vector2(600, 600),   # Town Square
 		Vector2(900, 600),   # Town Square
 	]
-	for i in range(agent_data.size()):
-		var data: Dictionary = agent_data[i]
+	# ARCH-004: Iterate roster resources instead of hardcoded dictionaries
+	for i in range(roster.agents.size()):
+		var def: AgentDefinition = roster.agents[i]
 		var agent = AgentScene.instantiate()
-		agent.agent_name = data["name"]
-		agent.personality = data["personality"]
-		agent.agent_color = data["color"]
-		agent.position = spawn_positions[i]
+		agent.agent_name = def.display_name
+		agent.personality = def.personality
+		agent.agent_color = def.color
+		agent.backstory = def.backstory
+		agent.position = spawn_positions[i % spawn_positions.size()]
 		agent.zone_rects = zone_rects
 		agent.waypoints = waypoints  # INT-005
 		agent.world_bounds = WORLD_BOUNDS  # AUDIT-012
@@ -333,8 +332,9 @@ func _spawn_agents() -> void:
 # The O(n²) loop is no longer needed here
 
 # MEM-005: Trigger LLM reflection when an agent hits the observation threshold
-func _on_reflection_ready(agent_name: String) -> void:
-	LlmDialogue.request_reflection(agent_name)
+# BUG-002: sim_time threaded for sim-time-aware memory storage
+func _on_reflection_ready(agent_name: String, sim_time: float) -> void:
+	LlmDialogue.request_reflection(agent_name, sim_time)
 
 func _on_agent_interaction(agent_name: String, other_name: String, dialogue: String) -> void:
 	ui_panel.log_interaction(agent_name, other_name, dialogue)

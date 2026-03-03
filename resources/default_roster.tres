@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgentRoster" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://resources/agent_roster.gd" id="1"]
+[ext_resource type="Resource" path="res://resources/agents/alice.tres" id="2"]
+[ext_resource type="Resource" path="res://resources/agents/bob.tres" id="3"]
+[ext_resource type="Resource" path="res://resources/agents/carol.tres" id="4"]
+[ext_resource type="Resource" path="res://resources/agents/dave.tres" id="5"]
+[ext_resource type="Resource" path="res://resources/agents/eve.tres" id="6"]
+
+[resource]
+script = ExtResource("1")
+agents = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6")]

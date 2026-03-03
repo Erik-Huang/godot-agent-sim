@@ -23,6 +23,7 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
 | `thoughts.gd` | Autoload — random quip per personality (reads from ContentData) |
 | `resources/personality_profile.gd` | Resource class for personality data (speed, seek_chance, etc.) |
 | `resources/agent_definition.gd` | Resource class for agent data (name, color, backstory, etc.) |
+| `resources/agent_roster.gd` | Resource class listing AgentDefinitions; loaded by main.gd |
 
 ---
 
@@ -39,12 +40,12 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
 - Pause (spacebar)
 - ✅ NavigationRegion2D pathfinding with NavigationAgent2D (t-20260302-004)
 - ✅ Navmesh baked from TileMapLayer collision geometry (NAV-002) — replaces hardcoded INTERIOR_WALLS
-
+- ✅ PersonalityProfile .tres resources wired, match blocks deleted (ARCH-003, t-20260303-002)
+- ✅ AgentDefinition .tres + AgentRoster resource wired, hardcoded agent_data deleted (ARCH-004, t-20260303-002)
 - ✅ LLM HTTP helper extracted (`_make_api_request`), importance rating routed through rate limiter (REFACTOR-001/BUG-001, t-20260303-003)
 
 **Known debt:**
-- `agent.gd` is a God Object (677 lines, 7+ responsibilities) — see REVIEW-2026-03-03.md
-- `PersonalityProfile` and `AgentDefinition` resources exist but are NOT wired — personality still uses match blocks in agent.gd
+- `agent.gd` is a God Object (659 lines, 7+ responsibilities) — see REVIEW-2026-03-03.md
 - `main.gd` has 70 lines of manual UI reparenting in `_ready()`
 
 **Next task:** t-20260303-004 (BUG-002/PERF-001: sim-time memory timestamps, throttle UI polling)

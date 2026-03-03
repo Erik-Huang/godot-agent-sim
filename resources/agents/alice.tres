@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://cvuelwhi1amlr" path="res://resources/agent_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Alice"
+personality = "curious"
+color = Color(0.3, 0.8, 1.0, 1)
+base_speed = 60.0
+detection_radius = 80.0
+backstory = ""
