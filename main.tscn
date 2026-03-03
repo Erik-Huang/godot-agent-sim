@@ -96,56 +96,77 @@ position = Vector2(1200, 400)
 
 [node name="AgentContainer" type="Node2D" parent="." unique_id=1803141859]
 
-[node name="UIPanel" type="VBoxContainer" parent="." unique_id=935282020]
-offset_left = 1200.0
-offset_right = 1450.0
-offset_bottom = 800.0
+[node name="UILayer" type="CanvasLayer" parent="."]
+layer = 10
+process_mode = 3
+
+[node name="ScreenRoot" type="Control" parent="UILayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="OuterPanel" type="MarginContainer" parent="UILayer/ScreenRoot"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.8
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="UIPanel" type="VBoxContainer" parent="UILayer/ScreenRoot/OuterPanel" unique_name_in_owner=true]
+unique_id = 935282020
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+clip_contents = true
 script = ExtResource("2")
 
-[node name="Title" type="Label" parent="UIPanel" unique_id=869032903]
+[node name="Title" type="Label" parent="UILayer/ScreenRoot/OuterPanel/UIPanel" unique_id=869032903]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.85, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "Agent Sim"
 horizontal_alignment = 1
 
-[node name="Separator" type="HSeparator" parent="UIPanel" unique_id=864827872]
+[node name="Separator" type="HSeparator" parent="UILayer/ScreenRoot/OuterPanel/UIPanel" unique_id=864827872]
 layout_mode = 2
 
-[node name="AgentsHeader" type="Label" parent="UIPanel" unique_id=810595676]
+[node name="AgentsHeader" type="Label" parent="UILayer/ScreenRoot/OuterPanel/UIPanel" unique_id=810595676]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
 theme_override_font_sizes/font_size = 13
 text = "— Agents —"
 horizontal_alignment = 1
 
-[node name="AgentScroll" type="ScrollContainer" parent="UIPanel"]
+[node name="AgentScroll" type="ScrollContainer" parent="UILayer/ScreenRoot/OuterPanel/UIPanel"]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.0
 horizontal_scroll_mode = 0
 
-[node name="AgentList" type="VBoxContainer" parent="UIPanel/AgentScroll" unique_id=1491348688]
+[node name="AgentList" type="VBoxContainer" parent="UILayer/ScreenRoot/OuterPanel/UIPanel/AgentScroll" unique_id=1491348688]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="Separator2" type="HSeparator" parent="UIPanel" unique_id=863382313]
+[node name="Separator2" type="HSeparator" parent="UILayer/ScreenRoot/OuterPanel/UIPanel" unique_id=863382313]
 layout_mode = 2
 
-[node name="LogHeader" type="Label" parent="UIPanel" unique_id=2014517178]
+[node name="LogHeader" type="Label" parent="UILayer/ScreenRoot/OuterPanel/UIPanel" unique_id=2014517178]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
 theme_override_font_sizes/font_size = 13
 text = "— Events —"
 horizontal_alignment = 1
 
-[node name="LogScroll" type="ScrollContainer" parent="UIPanel"]
+[node name="LogScroll" type="ScrollContainer" parent="UILayer/ScreenRoot/OuterPanel/UIPanel"]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 1.0
 horizontal_scroll_mode = 0
 
-[node name="LogList" type="VBoxContainer" parent="UIPanel/LogScroll" unique_id=730242085]
+[node name="LogList" type="VBoxContainer" parent="UILayer/ScreenRoot/OuterPanel/UIPanel/LogScroll" unique_id=730242085]
 layout_mode = 2
 
 [node name="LayerFloor" type="TileMapLayer" parent="." unique_id=136155189]

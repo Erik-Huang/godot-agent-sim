@@ -29,11 +29,8 @@ var zone_rects: Dictionary = {
 }
 
 @onready var agent_container: Node2D = $AgentContainer
-@onready var ui_panel: VBoxContainer = $UIPanel
+@onready var ui_panel: VBoxContainer = %UIPanel  # ARCH-006: unique name, lives in UILayer
 @onready var nav_region: NavigationRegion2D = $NavigationRegion2D
-
-# FIX-002: CanvasLayer for UI overlay
-var ui_layer: CanvasLayer
 
 # FIX-003: Camera zoom/pan state
 var _is_dragging: bool = false
@@ -77,78 +74,8 @@ func _ready() -> void:
 	pause_label.process_mode = Node.PROCESS_MODE_ALWAYS
 	pause_label.z_index = 100
 	add_child(pause_label)
-	# DBG-001: UIPanel stays responsive while paused
-	ui_panel.process_mode = Node.PROCESS_MODE_ALWAYS
 
-	# FIX-002: Move UI panel into a CanvasLayer overlay (right 20% of screen)
-	ui_layer = CanvasLayer.new()
-	ui_layer.layer = 10
-	ui_layer.process_mode = Node.PROCESS_MODE_ALWAYS
-	add_child(ui_layer)
-
-	# screen_root fills the full viewport — needed so anchors resolve correctly
-	var screen_root := Control.new()
-	screen_root.name = "ScreenRoot"
-	screen_root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	screen_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ui_layer.add_child(screen_root)
-
-	# outer_panel: MarginContainer anchored to right 20% — sizes its child correctly
-	var outer_panel := MarginContainer.new()
-	outer_panel.name = "OuterPanel"
-	outer_panel.anchor_left = 0.8
-	outer_panel.anchor_right = 1.0
-	outer_panel.anchor_top = 0.0
-	outer_panel.anchor_bottom = 1.0
-	outer_panel.offset_left = 0.0
-	outer_panel.offset_right = 0.0
-	outer_panel.offset_top = 0.0
-	outer_panel.offset_bottom = 0.0
-	outer_panel.add_theme_constant_override("margin_left", 0)
-	outer_panel.add_theme_constant_override("margin_top", 0)
-	outer_panel.add_theme_constant_override("margin_right", 0)
-	outer_panel.add_theme_constant_override("margin_bottom", 0)
-	screen_root.add_child(outer_panel)
-
-	# Move UIPanel into outer_panel — SIZE_EXPAND_FILL so VBoxContainer fills it
-	# Do NOT use set_anchors_preset on VBoxContainer — it breaks layout
-	ui_panel.get_parent().remove_child(ui_panel)
-	outer_panel.add_child(ui_panel)
-	ui_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ui_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	ui_panel.clip_contents = true
-
-	# Wrap AgentList in ScrollContainer so cards don't overflow
-	var agent_list_node: VBoxContainer = ui_panel.get_node_or_null("AgentList")
-	if agent_list_node:
-		var scroll := ScrollContainer.new()
-		scroll.name = "AgentScroll"
-		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		var al_parent: Node = agent_list_node.get_parent()
-		var al_idx: int = agent_list_node.get_index()
-		al_parent.remove_child(agent_list_node)
-		al_parent.add_child(scroll)
-		al_parent.move_child(scroll, al_idx)
-		scroll.add_child(agent_list_node)
-		agent_list_node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	# UIBackground: anchor it directly to screen_root behind outer_panel
-	var ui_bg: ColorRect = ui_panel.get_node_or_null("UIBackground")
-	if ui_bg:
-		ui_panel.remove_child(ui_bg)
-		screen_root.add_child(ui_bg)
-		screen_root.move_child(ui_bg, 0)
-		ui_bg.anchor_left = 0.8
-		ui_bg.anchor_right = 1.0
-		ui_bg.anchor_top = 0.0
-		ui_bg.anchor_bottom = 1.0
-		ui_bg.offset_left = 0.0
-		ui_bg.offset_right = 0.0
-		ui_bg.offset_top = 0.0
-		ui_bg.offset_bottom = 0.0
-		ui_bg.custom_minimum_size = Vector2.ZERO
-		ui_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# ARCH-006: UI layout (CanvasLayer/ScreenRoot/OuterPanel/UIPanel) now lives in main.tscn
 
 	# GFX-005: CanvasModulate for time-of-day lighting
 	canvas_mod = CanvasModulate.new()
