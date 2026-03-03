@@ -5,6 +5,14 @@ const AgentScene: PackedScene = preload("res://agent.tscn")
 # AUDIT-012: Centralised world bounds
 const WORLD_BOUNDS := Rect2(10, 10, 1180, 780)
 
+# NAV-001: Interior wall obstacles (Rect2 = top-left position + size)
+const INTERIOR_WALLS: Array[Rect2] = [
+	Rect2(180, 392, 300, 16),   # horizontal barrier between park & town square
+	Rect2(794, 80, 16, 220),    # vertical partition inside cafe
+	Rect2(650, 592, 300, 16),   # horizontal divider in town square
+]
+const NAV_WALL_MARGIN: float = 4.0  # extra padding around walls in navmesh cutout
+
 # TODO: replace with @export var roster: Array[AgentDefinition] once .tres files created
 var agent_data: Array[Dictionary] = [
 	{"name": "Alice", "personality": "curious", "color": Color(0.3, 0.8, 1.0)},
@@ -57,6 +65,7 @@ func _ready() -> void:
 	# AUDIT-015: randomize() removed — auto-called in Godot 4
 	_setup_navigation()
 	_setup_wall_shapes()
+	_setup_interior_walls()
 	# _setup_zone_visuals()  # Disabled: replaced by TileMapLayer visual map
 	# DBG-001: Main processes during pause (for input); agents pause via their container
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -266,6 +275,7 @@ func _setup_zone_visuals() -> void:
 
 func _setup_navigation() -> void:
 	var nav_poly: NavigationPolygon = NavigationPolygon.new()
+	# Outer boundary (clockwise in screen-space)
 	var outline: PackedVector2Array = PackedVector2Array([
 		Vector2(10, 10),
 		Vector2(1190, 10),
@@ -273,6 +283,17 @@ func _setup_navigation() -> void:
 		Vector2(10, 790),
 	])
 	nav_poly.add_outline(outline)
+	# NAV-001: Cut interior walls out of navmesh (counter-clockwise = hole)
+	for wall_rect: Rect2 in INTERIOR_WALLS:
+		var m: float = NAV_WALL_MARGIN
+		var r: Rect2 = wall_rect.grow(m)
+		var hole: PackedVector2Array = PackedVector2Array([
+			Vector2(r.position.x, r.position.y),                     # top-left
+			Vector2(r.position.x, r.position.y + r.size.y),          # bottom-left
+			Vector2(r.position.x + r.size.x, r.position.y + r.size.y), # bottom-right
+			Vector2(r.position.x + r.size.x, r.position.y),          # top-right
+		])
+		nav_poly.add_outline(hole)
 	# Use modern API to avoid deprecation warning
 	var source_geo: NavigationMeshSourceGeometryData2D = NavigationMeshSourceGeometryData2D.new()
 	NavigationServer2D.parse_source_geometry_data(nav_poly, source_geo, nav_region)
@@ -300,6 +321,31 @@ func _setup_wall_shapes() -> void:
 	right_shape.normal = Vector2(-1, 0)
 	right_shape.distance = -1195
 	$Walls/WallRight/CollisionShape2D.shape = right_shape
+
+# NAV-001: Create interior wall collision bodies and visuals
+func _setup_interior_walls() -> void:
+	var walls_parent: Node2D = $Walls
+	for i in range(INTERIOR_WALLS.size()):
+		var wall_rect: Rect2 = INTERIOR_WALLS[i]
+		# StaticBody2D with RectangleShape2D for physics collision
+		var body := StaticBody2D.new()
+		body.name = "InteriorWall%d" % i
+		body.position = wall_rect.get_center()
+		var cshape := CollisionShape2D.new()
+		var rect_shape := RectangleShape2D.new()
+		rect_shape.size = wall_rect.size
+		cshape.shape = rect_shape
+		body.add_child(cshape)
+		walls_parent.add_child(body)
+		# Visual: dark rectangle drawn behind agents
+		var visual := ColorRect.new()
+		visual.name = "WallVisual%d" % i
+		visual.position = wall_rect.position
+		visual.size = wall_rect.size
+		visual.color = Color(0.25, 0.22, 0.2, 0.9)
+		visual.z_index = -1
+		add_child(visual)
+		move_child(visual, walls_parent.get_index())
 
 func _spawn_agents() -> void:
 	var spawn_positions: Array[Vector2] = [
