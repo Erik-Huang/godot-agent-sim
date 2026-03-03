@@ -159,10 +159,11 @@ func _poll_agents() -> void:
 		var zone_text: String = agent.current_zone if agent.current_zone != "" else "—"
 		card["state_label"].text = "%s | %s" % [state_text, zone_text]
 
-		# Agenda — first incomplete item
+		# Agenda — first incomplete item (ARCH-005: via AgendaComponent)
 		var agenda_text: String = "—"
-		if agent.agenda.size() > 0:
-			var next_item: Dictionary = agent._get_next_agenda_item()
+		var agenda_comp: Node = agent.get_node_or_null("AgendaComponent")
+		if agenda_comp and agenda_comp.agenda.size() > 0:
+			var next_item: Dictionary = agenda_comp.get_next_agenda_item()
 			if not next_item.is_empty():
 				agenda_text = next_item.get("activity", "—")
 		card["agenda_label"].text = "agenda: %s" % agenda_text

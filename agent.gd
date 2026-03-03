@@ -33,10 +33,7 @@ var last_move_dir: Vector2 = Vector2.RIGHT
 # AUDIT-019: Sim time synced from main.gd each frame
 var sim_time: float = 8.0
 
-# INT-004: Daily agenda
-var agenda: Array = []  # [{activity: String, zone: String, done: bool}]
-var agenda_generated: bool = false
-var backstory: String = ""  # Set by main.gd for LLM agenda generation
+var backstory: String = ""  # Set by main.gd, passed to AgendaComponent
 
 # INT-005: Social waypoints
 var waypoints: Array = []
@@ -66,6 +63,7 @@ const FLEE_COOLDOWN: float = 8.0
 const BASE_SPEED: float = 60.0
 
 @onready var nav_agent: NavigationAgent2D = $NavigationAgent2D
+@onready var agenda_component: Node = $AgendaComponent  # ARCH-005
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var name_label: Label = $NameLabel
 @onready var speech_bubble: PanelContainer = $SpeechBubble
@@ -111,6 +109,13 @@ func _ready() -> void:
 	speed = BASE_SPEED * profile.speed_modifier
 	seek_chance = profile.seek_chance
 	approach_tendency = profile.approach_tendency
+
+	# ARCH-005: Wire agenda component
+	agenda_component.agent_name = agent_name
+	agenda_component.personality = personality
+	agenda_component.backstory = backstory
+	agenda_component.zone_rects = zone_rects
+	agenda_component.agenda_move_requested.connect(_on_agenda_move_requested)
 
 	# Start in IDLE
 	_enter_idle()
@@ -241,15 +246,12 @@ func _enter_idle() -> void:
 	_update_animation()
 
 func _process_idle(delta: float) -> void:
-	# INT-004: Generate agenda once at sim start (around 8am)
-	if not agenda_generated and sim_time >= 8.0:
-		_request_agenda()
-		agenda_generated = true
-	# INT-004: Follow agenda if idle long enough
-	if idle_timer < 0.5 and agenda.size() > 0:
-		var next_item: Dictionary = _get_next_agenda_item()
+	# INT-004 / ARCH-005: Delegate agenda to AgendaComponent
+	agenda_component.try_generate(sim_time)
+	if idle_timer < 0.5 and agenda_component.agenda.size() > 0:
+		var next_item: Dictionary = agenda_component.get_next_agenda_item()
 		if not next_item.is_empty():
-			_follow_agenda_item(next_item)
+			agenda_component.follow_agenda_item(next_item)
 			return
 	_poll_nearby_agents()
 	idle_timer -= delta
@@ -426,84 +428,16 @@ func _process_moving_to_zone(_delta: float) -> void:
 	# AUDIT-014: Allow interactions while traveling between zones
 	_poll_nearby_agents()
 	if nav_agent.is_navigation_finished():
-		# INT-004: Mark current agenda item done on arrival
-		for item in agenda:
-			if not item["done"]:
-				item["done"] = true
-				break
+		# INT-004 / ARCH-005: Mark current agenda item done on arrival
+		agenda_component.mark_current_done()
 		_enter_idle()
 		return
 	_move_toward_nav_target()
 
-# --- INT-004: Daily agenda helpers ---
-func _request_agenda() -> void:
-	var api_key: String = OS.get_environment("OPENAI_API_KEY")
-	if api_key != "" and LlmDialogue:
-		LlmDialogue.request_agenda(agent_name, personality, backstory, _on_agenda_received)
-	else:
-		# Fallback: template agenda based on personality
-		agenda = _get_template_agenda()
-
-func _get_template_agenda() -> Array:
-	match personality:
-		"curious":
-			return [
-				{"activity": "morning coffee", "zone": "cafe", "done": false},
-				{"activity": "explore the park", "zone": "park", "done": false},
-				{"activity": "afternoon people-watching", "zone": "town_square", "done": false},
-			]
-		"shy":
-			return [
-				{"activity": "quiet spot in the park", "zone": "park", "done": false},
-				{"activity": "wander around", "zone": "cafe", "done": false},
-				{"activity": "park bench evening", "zone": "park", "done": false},
-			]
-		"social":
-			return [
-				{"activity": "morning chat in the square", "zone": "town_square", "done": false},
-				{"activity": "lunch at the cafe", "zone": "cafe", "done": false},
-				{"activity": "evening socializing", "zone": "town_square", "done": false},
-			]
-		"wanderer":
-			return [
-				{"activity": "park stroll", "zone": "park", "done": false},
-				{"activity": "cafe visit", "zone": "cafe", "done": false},
-				{"activity": "town square loop", "zone": "town_square", "done": false},
-				{"activity": "back to the park", "zone": "park", "done": false},
-			]
-		"lazy":
-			return [
-				{"activity": "all day at the cafe", "zone": "cafe", "done": false},
-			]
-		_:
-			return [
-				{"activity": "visit the park", "zone": "park", "done": false},
-				{"activity": "stop by the cafe", "zone": "cafe", "done": false},
-			]
-
-func _on_agenda_received(items: Array) -> void:
-	if items.size() > 0:
-		agenda = items
-	else:
-		agenda = _get_template_agenda()
-
-func _get_next_agenda_item() -> Dictionary:
-	for item in agenda:
-		if not item["done"]:
-			return item
-	return {}
-
-func _follow_agenda_item(item: Dictionary) -> void:
-	if not zone_rects.has(item["zone"]):
-		item["done"] = true
-		return
-	var rect: Rect2 = zone_rects[item["zone"]]
-	var target_pos: Vector2 = Vector2(
-		randf_range(rect.position.x + 30, rect.end.x - 30),
-		randf_range(rect.position.y + 30, rect.end.y - 30)
-	)
+# ARCH-005: Agenda signal handler — moves agent to follow an agenda item
+func _on_agenda_move_requested(target_pos: Vector2, activity: String) -> void:
 	nav_agent.target_position = target_pos
-	show_action_text("→ %s" % item["activity"])
+	show_action_text("→ %s" % activity)
 	state = State.MOVING_TO_ZONE
 	state_changed.emit(agent_name, "moving_to_zone")
 	_update_animation()

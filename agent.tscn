@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://bagent1"]
+[gd_scene load_steps=3 format=3 uid="uid://bagent1"]
 
 [ext_resource type="Script" path="res://agent.gd" id="1"]
+[ext_resource type="Script" path="res://agenda_component.gd" id="2"]
 
 [node name="Agent" type="CharacterBody2D"]
 script = ExtResource("1")
@@ -39,3 +40,6 @@ horizontal_alignment = 1
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.1, 0.1, 0.1, 1)
+
+[node name="AgendaComponent" type="Node" parent="."]
+script = ExtResource("2")
