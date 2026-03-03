@@ -227,14 +227,38 @@ func _setup_wall_shapes() -> void:
 	$Walls/WallRight/CollisionShape2D.shape = right_shape
 
 
+# ARCH-007: Generate spawn positions from zone_rects instead of hardcoded array
+const SPAWN_MARGIN: float = 40.0
+const SPAWN_MIN_SPACING: float = 60.0
+const SPAWN_MAX_ATTEMPTS: int = 20
+
+func _generate_spawn_positions(count: int) -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	var zone_names: Array = zone_rects.keys()
+	for i in range(count):
+		var zone_name: String = zone_names[i % zone_names.size()]
+		var rect: Rect2 = zone_rects[zone_name]
+		var placed := false
+		for _attempt in range(SPAWN_MAX_ATTEMPTS):
+			var pos := Vector2(
+				randf_range(rect.position.x + SPAWN_MARGIN, rect.end.x - SPAWN_MARGIN),
+				randf_range(rect.position.y + SPAWN_MARGIN, rect.end.y - SPAWN_MARGIN)
+			)
+			var too_close := false
+			for existing in positions:
+				if pos.distance_to(existing) < SPAWN_MIN_SPACING:
+					too_close = true
+					break
+			if not too_close:
+				positions.append(pos)
+				placed = true
+				break
+		if not placed:
+			positions.append(rect.get_center())
+	return positions
+
 func _spawn_agents() -> void:
-	var spawn_positions: Array[Vector2] = [
-		Vector2(200, 200),   # Park
-		Vector2(300, 300),   # Park
-		Vector2(800, 200),   # Cafe
-		Vector2(600, 600),   # Town Square
-		Vector2(900, 600),   # Town Square
-	]
+	var spawn_positions: Array[Vector2] = _generate_spawn_positions(roster.agents.size())
 	# ARCH-004: Iterate roster resources instead of hardcoded dictionaries
 	for i in range(roster.agents.size()):
 		var def: AgentDefinition = roster.agents[i]
@@ -243,7 +267,7 @@ func _spawn_agents() -> void:
 		agent.personality = def.personality
 		agent.agent_color = def.color
 		agent.backstory = def.backstory
-		agent.position = spawn_positions[i % spawn_positions.size()]
+		agent.position = spawn_positions[i]
 		agent.zone_rects = zone_rects
 		agent.waypoints = waypoints  # INT-005
 		agent.world_bounds = WORLD_BOUNDS  # AUDIT-012
