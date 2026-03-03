@@ -1,17 +1,26 @@
 ; Engine configuration file.
 ; It's best edited using the editor UI and not directly,
-; but it can also be edited via text.
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="Agent Sim"
 run/main_scene="res://main.tscn"
-config/features=PackedStringArray("4.2")
+config/features=PackedStringArray("4.6")
 
 [autoload]
 
 ContentData="*res://content_data.gd"
-
 MemoryService="*res://memory_service.gd"
 Thoughts="*res://thoughts.gd"
 LlmDialogue="*res://llm_dialogue.gd"
@@ -21,11 +30,7 @@ LlmDialogue="*res://llm_dialogue.gd"
 window/size/viewport_width=1450
 window/size/viewport_height=800
 
-[navigation]
-
-2d/default_cell_size=1.0
-
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
+renderer/rendering_method="gl_compatibility"
