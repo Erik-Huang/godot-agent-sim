@@ -38,7 +38,7 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
 - Per-agent UI cards with live state, mood bar, last memory/speech
 - Pause (spacebar)
 - ✅ NavigationRegion2D pathfinding with NavigationAgent2D (t-20260302-004)
-- ✅ 3 interior wall obstacles cut out of navmesh — agents path around them
+- ✅ Navmesh baked from TileMapLayer collision geometry (NAV-002) — replaces hardcoded INTERIOR_WALLS
 
 **Known debt:**
 - `agent.gd` is a God Object (677 lines, 7+ responsibilities) — see REVIEW-2026-03-03.md
@@ -76,7 +76,7 @@ Full architecture proposal: see `ARCHITECTURE.md`
 - **area_entered is one-shot** — signal fires once on entry; poll `get_overlapping_areas()` in idle/wander to catch missed rolls
 - **Rate limiter** — all LLM calls (dialogue, partner response, reflection, agenda) route through `LlmDialogue.request_*`. Never call the OpenAI API directly from agent.gd
 - **Ninja Adventure assets** — still present in `assets/ui/theme/` (harmless) but must NOT be referenced in UI code. Cards always use StyleBoxFlat
-- **Interior walls** — defined as `INTERIOR_WALLS` constant in `main.gd`; navmesh holes use `NAV_WALL_MARGIN` padding. Wander targets inside walls are handled gracefully by NavigationAgent2D (routes to closest navigable point)
+- **Navmesh from TileMap** — `_setup_navigation()` uses `PARSED_GEOMETRY_STATIC_COLLIDERS` to read TileMapLayer collision shapes; no hardcoded wall rects. Wander targets inside walls are handled gracefully by NavigationAgent2D (routes to closest navigable point)
 
 ---
 
