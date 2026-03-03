@@ -97,3 +97,20 @@ When you finish a task, update the **Current State** section:
 - Update "Next task"
 
 This is how knowledge survives across sessions.
+
+---
+
+## Phase 3 Plan (2026-03-03)
+
+### 3A — Consolidation (high priority, in progress)
+- **ARCH-003/004** `t-20260303-002` Wire PersonalityProfile + AgentDefinition .tres resources, delete match blocks
+- **REFACTOR-001/BUG-001** `t-20260303-003` Extract LLM HTTP helper, route importance rating through rate limiter
+- **BUG-002/PERF-001** `t-20260303-004` Sim-time memory timestamps, throttle UI polling to 0.5s timer
+
+### 3B — Structural (medium, after 3A)
+- **ARCH-005/006/007** `t-20260303-005` Extract AgendaComponent, move UI layout to .tscn, dynamic spawn positions
+
+### 3C — Features (low, after 3B)
+- **GFX-007/SIM-001/LLM-001** `t-20260303-006` Sprite polish, emotional needs system, richer LLM prompts
+
+**Rule:** Do not start 3B until all 3A tasks are merged. Do not start 3C until 3B is merged.
