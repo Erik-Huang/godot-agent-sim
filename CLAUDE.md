@@ -16,6 +16,7 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
 |------|------|
 | `main.gd` / `main.tscn` | Scene root — spawns agents, wires UI, handles CanvasLayer layout |
 | `agent.gd` / `agent.tscn` | Agent node — state machine, movement, LLM calls, animations |
+| `agenda_component.gd` | Child of Agent — daily agenda generation, LLM/template fallback |
 | `ui.gd` | Side panel — per-agent cards, interaction log |
 | `llm_dialogue.gd` | LLM HTTP helper — queued requests, rate limiter (max 3 concurrent), fallbacks |
 | `memory_service.gd` | Autoload singleton — stores observations, relationships, sentiment, decay |
@@ -46,11 +47,15 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
 - ✅ Sim-time memory timestamps (BUG-002, t-20260303-004) — `add_observation` / `get_top_memories` / scoring use sim_time with wall-clock fallback
 - ✅ UI polling throttled to 0.5s Timer (PERF-001, t-20260303-004) — replaces per-frame `_process()`
 
-**Known debt:**
-- `agent.gd` is a God Object (659 lines, 7+ responsibilities) — see REVIEW-2026-03-03.md
-- `main.gd` has 70 lines of manual UI reparenting in `_ready()`
+- ✅ AgendaComponent extracted from agent.gd (ARCH-005, t-20260303-005) — agenda data, LLM request, templates in dedicated child node
+- ✅ UI layout moved to main.tscn (ARCH-006, t-20260303-005) — CanvasLayer/ScreenRoot/OuterPanel declarative, 70-line reparenting block deleted
+- ✅ Dynamic spawn positions from zone_rects (ARCH-007, t-20260303-005) — replaces hardcoded array, 40px margin, 60px spacing
 
-**Next task:** TBD (all 3A consolidation tasks complete — 3B structural tasks ready)
+**Known debt:**
+- `agent.gd` still large (~593 lines, 6+ responsibilities) — agenda extracted but state machine, movement, animation, proximity remain
+- `agenda_component.gd` uses personality match blocks for template agendas — could move to PersonalityProfile resource
+
+**Next task:** TBD (all 3A + 3B tasks complete — 3C feature tasks ready)
 
 ---
 
