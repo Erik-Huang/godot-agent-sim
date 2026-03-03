@@ -16,7 +16,7 @@ var log_entries: Array[String] = []
 const MAX_LOG_ENTRIES: int = 8
 var _log_labels: Array[Label] = []
 
-@onready var agent_list: VBoxContainer = $AgentList
+@onready var agent_list: VBoxContainer = $AgentScroll/AgentList
 @onready var log_list: VBoxContainer = $LogList
 
 func _ready() -> void:
@@ -29,17 +29,10 @@ func _ready() -> void:
 	_setup_panel_background()
 
 func _setup_panel_background() -> void:
-	# Style the UIBackground ColorRect replacement with NinePatch bg
-	var ui_bg: Control = get_node_or_null("UIBackground")
-	if ui_bg and bg_texture:
-		var stylebox := StyleBoxTexture.new()
-		stylebox.texture = bg_texture
-		stylebox.texture_margin_left = 4.0
-		stylebox.texture_margin_top = 4.0
-		stylebox.texture_margin_right = 4.0
-		stylebox.texture_margin_bottom = 4.0
-		if ui_bg is PanelContainer:
-			ui_bg.add_theme_stylebox_override("panel", stylebox)
+	# Apply background style directly on this panel node
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.09, 0.12, 1.0)
+	add_theme_stylebox_override("panel", sb)
 	# Style title and headers with pixel font
 	var title: Label = get_node_or_null("Title")
 	if title and pixel_font:
@@ -57,19 +50,26 @@ func register_agent(agent: CharacterBody2D) -> void:
 	agent_cards[agent.agent_name] = card
 
 func _create_agent_card(agent_name: String, personality_tag: String, agent_color: Color) -> Dictionary:
-	# Card container — NinePatchRect with wood panel texture
-	var card := NinePatchRect.new()
+	# Card container — PanelContainer with texture or flat fallback
+	var card := PanelContainer.new()
 	card.name = "Card_%s" % agent_name
 	if panel_texture:
-		card.texture = panel_texture
-		card.patch_margin_left = 4
-		card.patch_margin_top = 4
-		card.patch_margin_right = 4
-		card.patch_margin_bottom = 4
-		card.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
-		card.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
-	card.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	card.custom_minimum_size = Vector2(0, 0)
+		var sb := StyleBoxTexture.new()
+		sb.texture = panel_texture
+		sb.texture_margin_left = 4
+		sb.texture_margin_right = 4
+		sb.texture_margin_top = 4
+		sb.texture_margin_bottom = 4
+		card.add_theme_stylebox_override("panel", sb)
+	else:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.1, 0.12, 0.15, 0.9)
+		sb.border_width_left = 1
+		sb.border_width_right = 1
+		sb.border_width_top = 1
+		sb.border_width_bottom = 1
+		sb.border_color = Color(0.3, 0.35, 0.4, 0.5)
+		card.add_theme_stylebox_override("panel", sb)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Margin inside card
