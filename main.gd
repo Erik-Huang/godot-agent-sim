@@ -89,36 +89,52 @@ func _ready() -> void:
 	ui_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(ui_layer)
 
-	# Anchors only resolve against a Control parent — add full-screen wrapper
+	# screen_root fills the full viewport — needed so anchors resolve correctly
 	var screen_root := Control.new()
 	screen_root.name = "ScreenRoot"
 	screen_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	screen_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_layer.add_child(screen_root)
 
-	ui_panel.get_parent().remove_child(ui_panel)
-	screen_root.add_child(ui_panel)
+	# outer_panel is a plain Control anchored to right 20% — this does the positioning
+	var outer_panel := Control.new()
+	outer_panel.name = "OuterPanel"
+	outer_panel.anchor_left = 0.8
+	outer_panel.anchor_right = 1.0
+	outer_panel.anchor_top = 0.0
+	outer_panel.anchor_bottom = 1.0
+	outer_panel.offset_left = 0.0
+	outer_panel.offset_right = 0.0
+	outer_panel.offset_top = 0.0
+	outer_panel.offset_bottom = 0.0
+	screen_root.add_child(outer_panel)
 
-	# Anchor to right 20% of viewport (works now that parent is a Control)
-	ui_panel.anchor_left = 0.8
-	ui_panel.anchor_right = 1.0
-	ui_panel.anchor_top = 0.0
-	ui_panel.anchor_bottom = 1.0
-	ui_panel.offset_left = 0
-	ui_panel.offset_right = 0
-	ui_panel.offset_top = 0
-	ui_panel.offset_bottom = 0
+	# Move UIPanel into outer_panel and make it fill the full outer_panel
+	ui_panel.get_parent().remove_child(ui_panel)
+	outer_panel.add_child(ui_panel)
+	ui_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui_panel.offset_left = 0.0
+	ui_panel.offset_right = 0.0
+	ui_panel.offset_top = 0.0
+	ui_panel.offset_bottom = 0.0
 	ui_panel.clip_contents = true
 
-	# Wrap AgentList in ScrollContainer so cards don't overflow below panel
+	# Fix UIBackground — remove hardcoded size so it fills naturally
+	var ui_bg: ColorRect = ui_panel.get_node_or_null("UIBackground")
+	if ui_bg:
+		ui_bg.custom_minimum_size = Vector2.ZERO
+		ui_bg.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		ui_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	# Wrap AgentList in ScrollContainer so cards don't overflow
 	var agent_list_node: VBoxContainer = ui_panel.get_node_or_null("AgentList")
 	if agent_list_node:
 		var scroll := ScrollContainer.new()
 		scroll.name = "AgentScroll"
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		var al_parent := agent_list_node.get_parent()
-		var al_idx := agent_list_node.get_index()
+		var al_parent: Node = agent_list_node.get_parent()
+		var al_idx: int = agent_list_node.get_index()
 		al_parent.remove_child(agent_list_node)
 		al_parent.add_child(scroll)
 		al_parent.move_child(scroll, al_idx)

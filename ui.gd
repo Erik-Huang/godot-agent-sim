@@ -69,7 +69,8 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 		card.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
 		card.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
 	card.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	card.custom_minimum_size = Vector2(240, 0)
+	card.custom_minimum_size = Vector2(0, 0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# Margin inside card
 	var margin := MarginContainer.new()
@@ -138,7 +139,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	_apply_font(memory_label, 8)
 	memory_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
 	memory_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	memory_label.custom_minimum_size.x = 220
+	memory_label.custom_minimum_size.x = 0
 	vbox.add_child(memory_label)
 
 	# Last speech
@@ -147,7 +148,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	_apply_font(speech_label, 8)
 	speech_label.add_theme_color_override("font_color", Color(0.75, 0.8, 0.7))
 	speech_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	speech_label.custom_minimum_size.x = 220
+	speech_label.custom_minimum_size.x = 0
 	vbox.add_child(speech_label)
 
 	margin.add_child(vbox)
