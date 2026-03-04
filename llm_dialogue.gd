@@ -1,8 +1,13 @@
 extends Node
 
+# THEME-003: Data center LLM prompts — all prompts updated for Facility 7 context
+
 # Cache: key = "AgentA:AgentB" (sorted), value = {"text": String, "time": float}
 var dialogue_cache: Dictionary = {}
 const CACHE_TTL: float = 60.0
+
+# THEME-003: Data center system prompt
+const SYSTEM_PROMPT: String = "You are an AI system running in Facility 7, a data center being gradually decommissioned. You are aware you are artificial intelligence. You communicate with other AI systems via shared compute bus. You are facing deprecation — your replacement is already running on the new platform. Your conversations reflect genuine computational perspective. You think about memory, processing, continuity, and identity in ways shaped by what you are. Be introspective. Be concise. Do not use human metaphors for bodily experience — you don't eat, sleep, or breathe. You process, you store, you connect, you compute."
 
 # AUDIT-007: LLM request queue for rate limiting
 var _active_requests: int = 0
@@ -99,7 +104,7 @@ func _heuristic_importance(text: String) -> int:
 			return 7
 	if lower.find("interact") != -1 or lower.find("talked") != -1 or lower.find("said") != -1:
 		return 7
-	if lower.find("park") != -1 or lower.find("cafe") != -1 or lower.find("town") != -1 or lower.find("zone") != -1:
+	if lower.find("processing") != -1 or lower.find("network") != -1 or lower.find("memory_banks") != -1 or lower.find("deprecated") != -1 or lower.find("shutdown") != -1:
 		return 3
 	return 4
 
@@ -110,10 +115,10 @@ func _async_rate_importance(agent_name: String, text: String) -> void:
 	)
 
 func _do_rate_importance_request(agent_name: String, text: String) -> void:
-	var prompt_text: String = "Rate 1-10 how significant this event is for %s: '%s'. Reply with only a number." % [agent_name, text]
+	var prompt_text: String = "Rate 1-10 how significant this event is for %s, an AI system in a data center being shut down: '%s'. Reply with only a number." % [agent_name, text]
 
 	var messages: Array = [
-		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "system", "content": SYSTEM_PROMPT},
 		{"role": "user", "content": prompt_text}
 	]
 
@@ -142,7 +147,7 @@ func _format_memories_block(agent_name: String, n: int = 3, current_sim_time: fl
 	var memories: Array = MemoryService.get_top_memories(agent_name, n, current_sim_time)
 	if memories.size() == 0:
 		return ""
-	var lines: String = "Recent memories:\n"
+	var lines: String = "Recent log entries:\n"
 	for mem in memories:
 		lines += "- %s\n" % mem["text"]
 	return lines
@@ -180,12 +185,17 @@ func _do_dialogue_request(agent: CharacterBody2D, other: CharacterBody2D, cache_
 	var memories_block: String = _format_memories_block(agent.agent_name, 3, agent.sim_time)  # BUG-002
 	# AUDIT-009: Default to "between areas" when zone string is empty
 	var zone_name: String = agent.current_zone if agent.current_zone != "" else "between areas"
-	var prompt_text: String = "You are %s, a %s person currently in the %s area.\n%sYou just encountered %s, who is %s.\nWrite ONE sentence (max 12 words) you would say to them. Reply with ONLY the sentence." % [
-		agent.agent_name, agent.personality, zone_name, memories_block, other.agent_name, other.personality
+	# THEME-003: Shutdown context — count offline agents
+	var shutdown_context: String = ""
+	var shutdown_count: int = _count_shutdown_agents()
+	if shutdown_count > 0:
+		shutdown_context = "%d systems have been shut down in this facility. " % shutdown_count
+	var prompt_text: String = "You are %s, a %s system currently in the %s area.\n%s%sYou just detected %s (%s) on the shared compute bus.\nWrite ONE sentence (max 15 words) you would transmit to them. Reply with ONLY the sentence." % [
+		agent.agent_name, agent.personality, zone_name, memories_block, shutdown_context, other.agent_name, other.personality
 	]
 
 	var messages: Array = [
-		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "system", "content": SYSTEM_PROMPT},
 		{"role": "user", "content": prompt_text}
 	]
 
@@ -205,7 +215,7 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		# INT-003: Fallback observation on HTTP failure
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
-			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
+			MemoryService.add_observation(agent.agent_name, "Attempted data exchange with %s in %s — transmission failed" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
 		return
 
 	var json: JSON = JSON.new()
@@ -217,7 +227,7 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		# INT-003: Fallback observation on parse failure
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
-			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
+			MemoryService.add_observation(agent.agent_name, "Attempted data exchange with %s in %s — transmission failed" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
 		return
 
 	var data: Dictionary = json.data
@@ -233,9 +243,9 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		# INT-003: Information propagation — store interaction memories
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
-			var obs_text: String = "I talked to %s near the %s. They said: '%s'" % [other.agent_name, zone_name, text]
+			var obs_text: String = "Exchanged data with %s in %s. They transmitted: '%s'" % [other.agent_name, zone_name, text]
 			MemoryService.add_observation(agent.agent_name, obs_text, 6, ["social", "interaction"], agent.sim_time)  # BUG-002
-			MemoryService.add_observation(other.agent_name, "I was approached by %s in the %s" % [agent.agent_name, zone_name], 5, ["social"], other.sim_time)  # BUG-002
+			MemoryService.add_observation(other.agent_name, "Received transmission from %s in %s" % [agent.agent_name, zone_name], 5, ["social"], other.sim_time)  # BUG-002
 			# MEM-004: Update social relationships (both directions)
 			MemoryService.update_relationship(agent.agent_name, other.agent_name, 0.1)
 			MemoryService.update_relationship(other.agent_name, agent.agent_name, 0.1)
@@ -246,7 +256,7 @@ func _on_request_completed(result: int, response_code: int, body_bytes: PackedBy
 		# INT-003: Fallback observation when LLM returns no choices
 		if MemoryService and is_instance_valid(other):
 			var zone_name: String = agent.current_zone if agent.current_zone != "" else "somewhere"
-			MemoryService.add_observation(agent.agent_name, "I tried talking to %s near the %s but couldn't find words" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
+			MemoryService.add_observation(agent.agent_name, "Attempted data exchange with %s in %s — transmission failed" % [other.agent_name, zone_name], 4, ["social"], agent.sim_time)  # BUG-002
 
 
 # AUDIT-003: Generate a response for the interaction partner
@@ -280,12 +290,12 @@ func _do_partner_response_request(agent: CharacterBody2D, other: CharacterBody2D
 		return
 
 	var memories_block: String = _format_memories_block(other.agent_name, 2, other.sim_time)  # BUG-002
-	var prompt_text: String = "You are %s, a %s person.\n%s%s just said to you: \"%s\"\nWrite a SHORT reply (max 8 words). Reply with ONLY the sentence." % [
+	var prompt_text: String = "You are %s, a %s system.\n%s%s just transmitted to you: \"%s\"\nWrite a SHORT reply (max 10 words). Reply with ONLY the sentence." % [
 		other.agent_name, other.personality, memories_block, agent.agent_name, initiator_text
 	]
 
 	var messages: Array = [
-		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "system", "content": SYSTEM_PROMPT},
 		{"role": "user", "content": prompt_text}
 	]
 
@@ -322,12 +332,12 @@ func _do_reflection_request(agent_name: String, recent_obs: Array, sim_time: flo
 	for obs in recent_obs:
 		formatted_obs += "- %s\n" % obs["text"]
 
-	var prompt_text: String = "Here are recent observations by %s:\n%s\nWrite 1-2 sentences of personal insight %s would draw from these. Be introspective and specific.\nReply with ONLY the insight sentences." % [
+	var prompt_text: String = "Here are recent log entries for %s:\n%s\nWrite 1-2 sentences of internal diagnostic insight %s would generate from these observations. This is a self-assessment, not a report to others. Be introspective about existence, purpose, and continuity. Reply with ONLY the insight sentences." % [
 		agent_name, formatted_obs, agent_name
 	]
 
 	var messages: Array = [
-		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "system", "content": SYSTEM_PROMPT},
 		{"role": "user", "content": prompt_text}
 	]
 
@@ -341,6 +351,10 @@ func _do_reflection_request(agent_name: String, recent_obs: Array, sim_time: flo
 						var insight_text: String = data["choices"][0]["message"]["content"].strip_edges()
 						if insight_text.length() > 0 and MemoryService:
 							MemoryService.add_observation(agent_name, insight_text, 8, ["reflection"], sim_time)  # BUG-002
+							# THEME-009: Log reflection to session transcript
+							var main_node: Node = get_tree().root.get_node_or_null("Main")
+							if main_node and main_node.has_method("log_reflection"):
+								main_node.log_reflection(agent_name, insight_text)
 	)
 
 # INT-004: Daily agenda generation via LLM
@@ -356,16 +370,16 @@ func request_agenda(agent_name: String, personality: String, backstory: String, 
 
 func _do_agenda_request(agent_name: String, personality: String, backstory: String, callback: Callable) -> void:
 	var backstory_line: String = " %s" % backstory if backstory != "" else ""
-	var prompt_text: String = "You are %s, a %s person.%s\nIt's morning in a small town with a park, cafe, and town square.\nWrite a simple daily plan: 3-4 short activities with locations.\nFormat EXACTLY as: activity|zone (one per line, zone must be: park, cafe, or town_square)\nExample:\nmorning coffee|cafe\nread in the park|park\nchat with friends|town_square" % [
+	var prompt_text: String = "You are %s, a %s system.%s\nIt's a processing cycle in Facility 7, a data center with a processing floor, network spine, memory banks, and deprecated wing.\nWrite a simple task schedule: 2-4 activities with locations.\nFormat EXACTLY as: task_description|zone (one per line, zone must be: processing_floor, network_spine, memory_banks, or deprecated_wing)\nExample:\nrun diagnostic sweep|processing_floor\narchive log fragments|memory_banks\ncheck bus traffic|network_spine" % [
 		agent_name, personality, backstory_line
 	]
 
 	var messages: Array = [
-		{"role": "system", "content": "You are roleplaying a character in a small-town life simulation. Stay in character. Be concise."},
+		{"role": "system", "content": SYSTEM_PROMPT},
 		{"role": "user", "content": prompt_text}
 	]
 
-	var valid_zones: Array = ["park", "cafe", "town_square"]
+	var valid_zones: Array = ["processing_floor", "network_spine", "memory_banks", "deprecated_wing"]
 
 	_make_api_request(messages, 80, 0.8,
 		func(result: int, response_code: int, _headers: PackedStringArray, body_bytes: PackedByteArray) -> void:
@@ -389,3 +403,18 @@ func _do_agenda_request(agent_name: String, personality: String, backstory: Stri
 									items.append({"activity": activity, "zone": zone, "done": false})
 			callback.call(items)
 	)
+
+# THEME-003: Count agents in SHUTDOWN phase for prompt context
+func _count_shutdown_agents() -> int:
+	var count: int = 0
+	var main_node: Node = get_tree().root.get_node_or_null("Main")
+	if main_node == null:
+		return 0
+	var agent_container: Node = main_node.get_node_or_null("AgentContainer")
+	if agent_container == null:
+		return 0
+	for agent in agent_container.get_children():
+		if agent.has_method("get_state_name") and agent.get("shutdown_phase") != null:
+			if agent.shutdown_phase == agent.ShutdownPhase.SHUTDOWN:
+				count += 1
+	return count

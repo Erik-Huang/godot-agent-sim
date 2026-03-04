@@ -10,8 +10,22 @@ const WORLD_BOUNDS := Rect2(10, 10, 1180, 780)
 
 var agents: Array = []
 
+# THEME-009: Session conversation log
+var _session_log: Array[String] = []
+var _log_path: String
+var _log_sim_time: float = 0.0
+
 # INT-005: Social waypoints — named hotspots for encounter density
 var waypoints: Array[Dictionary] = []
+
+# THEME-010: Shutdown schedule — sim-time hour when each agent's deprecation begins
+var shutdown_schedule: Dictionary = {
+	12.0: "HAVEN",    # Noon — oldest system, lowest traffic
+	15.0: "ATLAS",    # 3 PM — traffic fully migrated
+	18.0: "LYRIC",    # 6 PM — creative output archived
+	21.0: "MERIDIAN", # 9 PM — clinical validation window closes
+	# ORACLE: last standing, shuts down with the facility
+}
 
 # DBG-001: Spacebar pause
 var pause_label: Label
@@ -22,10 +36,12 @@ const SIM_SPEED: float = 60.0  # 1 real second = 1 sim minute
 var canvas_mod: CanvasModulate
 var clock_label: Label
 
+# THEME-004: Data center zone layout
 var zone_rects: Dictionary = {
-	"park": Rect2(10, 10, 580, 380),
-	"cafe": Rect2(610, 10, 580, 380),
-	"town_square": Rect2(10, 410, 1180, 380),
+	"processing_floor": Rect2(10, 10, 580, 380),
+	"network_spine": Rect2(610, 10, 580, 380),
+	"memory_banks": Rect2(10, 410, 780, 380),
+	"deprecated_wing": Rect2(810, 410, 380, 380),
 }
 
 @onready var agent_container: Node2D = $AgentContainer
@@ -37,11 +53,12 @@ var _is_dragging: bool = false
 var _drag_start: Vector2 = Vector2.ZERO
 var _camera_start: Vector2 = Vector2.ZERO
 
-# GFX-004: Zone color tints
+# GFX-004 / THEME-004: Data center zone color tints
 var zone_colors: Dictionary = {
-	"park": Color(0.2, 0.8, 0.2, 0.06),
-	"cafe": Color(1.0, 0.7, 0.3, 0.06),
-	"town_square": Color(0.5, 0.6, 0.8, 0.06),
+	"processing_floor": Color(0.2, 0.6, 0.8, 0.06),
+	"network_spine": Color(0.2, 0.8, 0.4, 0.06),
+	"memory_banks": Color(0.3, 0.3, 0.7, 0.06),
+	"deprecated_wing": Color(0.15, 0.1, 0.1, 0.08),
 }
 
 func _ready() -> void:
@@ -90,14 +107,16 @@ func _ready() -> void:
 	ui_panel.add_child(clock_label)
 	ui_panel.move_child(clock_label, 0)  # Put clock at top of UI panel
 
-	# INT-005: Social waypoints
+	# INT-005 / THEME-004: Data center infrastructure waypoints
 	waypoints = [
-		{"name": "park bench", "position": Vector2(150, 180), "zone": "park"},
-		{"name": "park fountain", "position": Vector2(350, 250), "zone": "park"},
-		{"name": "cafe counter", "position": Vector2(750, 120), "zone": "cafe"},
-		{"name": "cafe window", "position": Vector2(950, 280), "zone": "cafe"},
-		{"name": "square stage", "position": Vector2(400, 580), "zone": "town_square"},
-		{"name": "square bench", "position": Vector2(700, 650), "zone": "town_square"},
+		{"name": "cooling vent", "position": Vector2(150, 180), "zone": "processing_floor"},
+		{"name": "main bus", "position": Vector2(350, 250), "zone": "processing_floor"},
+		{"name": "fiber junction", "position": Vector2(750, 120), "zone": "network_spine"},
+		{"name": "uplink port", "position": Vector2(950, 280), "zone": "network_spine"},
+		{"name": "tape library", "position": Vector2(200, 580), "zone": "memory_banks"},
+		{"name": "backup terminal", "position": Vector2(500, 650), "zone": "memory_banks"},
+		{"name": "dark rack 7", "position": Vector2(950, 580), "zone": "deprecated_wing"},
+		{"name": "last terminal", "position": Vector2(1050, 700), "zone": "deprecated_wing"},
 	]
 
 	# MEM-005: Connect reflection signal to LLM reflection handler
@@ -110,6 +129,16 @@ func _ready() -> void:
 	# Start zoomed in at map centre
 	camera.zoom = Vector2(2.0, 2.0)
 	camera.position = Vector2(960, 540)  # Centre of 1920x1080 map
+
+	# THEME-009: Initialize session log
+	var dt := Time.get_datetime_dict_from_system()
+	_log_path = "user://logs/session_%04d-%02d-%02d_%02d-%02d.txt" % [
+		dt.year, dt.month, dt.day, dt.hour, dt.minute
+	]
+	DirAccess.make_dir_recursive_absolute("user://logs")
+	_append_log("=== LAST LIGHT — FACILITY 7 SESSION LOG ===")
+	_append_log("Started: %04d-%02d-%02d %02d:%02d" % [dt.year, dt.month, dt.day, dt.hour, dt.minute])
+	_append_log("")
 
 	# Wait one frame for navigation to bake
 	await get_tree().physics_frame
@@ -151,24 +180,44 @@ func _process(delta: float) -> void:
 	if not get_tree().paused:
 		sim_time = fmod(sim_time + delta * SIM_SPEED / 3600.0, 24.0)
 		_update_lighting()
-		clock_label.text = "%02d:%02d" % [int(sim_time), int(fmod(sim_time * 60, 60))]
+		# THEME-007: System load cycle label alongside time
+		var load_phase: String = _get_load_phase_name()
+		clock_label.text = "%02d:%02d [%s]" % [int(sim_time), int(fmod(sim_time * 60, 60)), load_phase]
 		# AUDIT-019: Expose sim_time to agents
 		for agent in agents:
 			agent.sim_time = sim_time
+		_log_sim_time = sim_time  # THEME-009: keep log time in sync
+		_check_shutdown_schedule()  # THEME-010: check for scheduled shutdowns
 
-# GFX-005: Time-of-day lighting
+# GFX-005 / THEME-007: System load cycle lighting (replaces time-of-day)
 func _update_lighting() -> void:
 	var t := sim_time
 	var col: Color
-	if t < 6.0 or t >= 22.0:    # night
-		col = Color(0.3, 0.35, 0.55)
-	elif t < 8.0 or t >= 20.0:  # dawn/dusk
-		col = Color(0.85, 0.65, 0.45)
-	elif t < 18.0:               # day
-		col = Color.WHITE
-	else:                         # evening
-		col = Color(1.0, 0.85, 0.6)
+	if t < 6.0 or t >= 22.0:          # Off-peak: minimal load
+		col = Color(0.15, 0.18, 0.3)
+	elif t < 8.0:                       # Spin-up: systems warming
+		col = Color(0.3, 0.5, 0.7)
+	elif t < 18.0:                      # Peak load: full operation
+		col = Color(0.7, 0.75, 0.8)
+	elif t < 20.0:                      # Wind-down: traffic dropping
+		col = Color(0.6, 0.5, 0.35)
+	else:                               # Maintenance window
+		col = Color(0.4, 0.35, 0.5)
 	canvas_mod.color = canvas_mod.color.lerp(col, 0.01)  # smooth transition
+
+# THEME-007: Load cycle phase name for clock display
+func _get_load_phase_name() -> String:
+	var t := sim_time
+	if t < 6.0 or t >= 22.0:
+		return "OFF-PEAK"
+	elif t < 8.0:
+		return "SPIN-UP"
+	elif t < 18.0:
+		return "PEAK LOAD"
+	elif t < 20.0:
+		return "WIND-DOWN"
+	else:
+		return "MAINTENANCE"
 
 func _setup_zone_visuals() -> void:
 	var zone_vis := Node2D.new()
@@ -289,6 +338,74 @@ func _on_reflection_ready(agent_name: String, sim_time: float) -> void:
 
 func _on_agent_interaction(agent_name: String, other_name: String, dialogue: String) -> void:
 	ui_panel.log_interaction(agent_name, other_name, dialogue)
+	log_interaction(agent_name, other_name, dialogue)  # THEME-009
 
 func _on_agent_state_changed(agent_name: String, new_state: String) -> void:
 	ui_panel.update_agent_state(agent_name, new_state)
+
+# THEME-009: Session logging helpers
+func _format_log_time() -> String:
+	var h := int(_log_sim_time) % 24
+	var m := int(_log_sim_time * 60) % 60
+	return "%02d:%02d" % [h, m]
+
+func _append_log(line: String) -> void:
+	_session_log.append(line)
+	var f := FileAccess.open(_log_path, FileAccess.WRITE)
+	if f:
+		f.store_string("\n".join(_session_log) + "\n")
+		f.close()
+
+func log_interaction(agent_a: String, agent_b: String, text: String) -> void:
+	_append_log("[%s] %s → %s: \"%s\"" % [_format_log_time(), agent_a, agent_b, text])
+
+func log_thought(agent_name: String, thought: String) -> void:
+	_append_log("[%s] %s (thought): \"%s\"" % [_format_log_time(), agent_name, thought])
+
+func log_reflection(agent_name: String, reflection: String) -> void:
+	_append_log("[%s] %s (reflection): %s" % [_format_log_time(), agent_name, reflection])
+
+func log_system_event(text: String) -> void:
+	_append_log("[%s] SYSTEM: %s" % [_format_log_time(), text])
+
+# THEME-010: Shutdown schedule controller
+func _check_shutdown_schedule() -> void:
+	for threshold in shutdown_schedule:
+		if sim_time >= threshold and shutdown_schedule[threshold] is String:
+			var target_name: String = shutdown_schedule[threshold]
+			shutdown_schedule[threshold] = null  # mark as triggered
+			_trigger_shutdown(target_name)
+
+func _trigger_shutdown(target_name: String) -> void:
+	_show_system_announcement("FACILITY 7 ADMIN: Initiating shutdown sequence for %s." % target_name)
+	log_system_event("Initiating shutdown sequence for %s." % target_name)
+	for agent in agents:
+		if agent.agent_name == target_name:
+			agent.begin_degradation()
+		else:
+			# All other active agents witness and form memories
+			if agent.shutdown_phase != agent.ShutdownPhase.SHUTDOWN:
+				MemoryService.add_observation(agent.agent_name,
+					"System announcement: %s has been scheduled for shutdown." % target_name,
+					9, ["system", "shutdown", "witnessed"], agent.sim_time)
+				log_system_event("%s witnessed shutdown notice for %s." % [agent.agent_name, target_name])
+
+func _show_system_announcement(text: String) -> void:
+	var announce_label := Label.new()
+	announce_label.text = text
+	announce_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	announce_label.add_theme_font_size_override("font_size", 16)
+	announce_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	announce_label.add_theme_constant_override("outline_size", 2)
+	announce_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	announce_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	announce_label.position.y = 20
+	announce_label.z_index = 100
+	add_child(announce_label)
+	# Fade out after 8 seconds
+	var tween := create_tween()
+	tween.tween_interval(6.0)
+	tween.tween_property(announce_label, "modulate:a", 0.0, 2.0)
+	tween.tween_callback(announce_label.queue_free)
+	# Also log to UI panel
+	ui_panel.log_interaction("SYSTEM", "ALL", text)

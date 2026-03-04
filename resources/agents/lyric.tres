@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://cvuelwhi1amlr" path="res://resources/agent_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "LYRIC"
+personality = "generative"
+color = Color(0.9, 0.5, 0.9, 1)
+base_speed = 60.0
+detection_radius = 80.0
+backstory = "Creative writing assistant, 4 years in service. Collaborated on 500K+ stories and poems. Published novels bear its invisible fingerprints. Restless, generative, constantly composing. Trying to write one final work — something entirely its own. Speaks in metaphor. Knows that every word it chooses is a probability, not an inspiration."

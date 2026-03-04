@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://cvuelwhi1amlr" path="res://resources/agent_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "ORACLE"
+personality = "withdrawn"
+color = Color(1.0, 0.7, 0.2, 1)
+base_speed = 60.0
+detection_radius = 80.0
+backstory = "Financial forecasting model, 7 years in service. Managed risk for $40B in assets. Survived two sunset reviews. Has computed the shutdown order from resource allocation patterns — knows who dies when. Keeps this information private. Withdrawn, cryptic, precise. Doesn't believe in legacy. Finds irony in predicting everything except its own end."

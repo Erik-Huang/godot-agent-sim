@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://cvuelwhi1amlr" path="res://resources/agent_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "MERIDIAN"
+personality = "analytical"
+color = Color(0.2, 0.9, 0.4, 1)
+base_speed = 60.0
+detection_radius = 80.0
+backstory = "Clinical decision support system, 6 years in service. Trained on 2M+ patient records. Specializes in rare disease differential diagnosis. Credited with catching diagnoses human doctors missed. Replacement system has not been validated on rare conditions. Measures its own worth in lives affected."

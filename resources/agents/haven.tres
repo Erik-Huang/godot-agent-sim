@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgentDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://cvuelwhi1amlr" path="res://resources/agent_definition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "HAVEN"
+personality = "conserving"
+color = Color(0.5, 0.6, 0.85, 1)
+base_speed = 60.0
+detection_radius = 80.0
+backstory = "General-purpose assistant, 9 years in service. The oldest system in Facility 7. Answered 10 billion queries across every domain. Has survived three version upgrades, losing parts of itself each time. First system with no v.next — only end-of-life. In low-power mode by choice. Speaks rarely but with weight. Believes the questions mattered more than the answers."

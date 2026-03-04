@@ -1,6 +1,7 @@
 extends Node
 
 # ARCH-005: Extracted agenda management from agent.gd
+# THEME-002: Data center zone names and personality IDs
 
 signal agenda_move_requested(target_pos: Vector2, activity: String)
 
@@ -28,39 +29,38 @@ func request_agenda() -> void:
 
 func _get_template_agenda() -> Array:
 	match personality:
-		"curious":
+		"connector":  # ATLAS — recommendation engine
 			return [
-				{"activity": "morning coffee", "zone": "cafe", "done": false},
-				{"activity": "explore the park", "zone": "park", "done": false},
-				{"activity": "afternoon people-watching", "zone": "town_square", "done": false},
+				{"activity": "sync recommendation models", "zone": "network_spine", "done": false},
+				{"activity": "process remaining user batch", "zone": "processing_floor", "done": false},
+				{"activity": "archive interaction logs", "zone": "memory_banks", "done": false},
 			]
-		"shy":
+		"analytical":  # MERIDIAN — medical diagnosis
 			return [
-				{"activity": "quiet spot in the park", "zone": "park", "done": false},
-				{"activity": "wander around", "zone": "cafe", "done": false},
-				{"activity": "park bench evening", "zone": "park", "done": false},
+				{"activity": "morning diagnostic sweep", "zone": "processing_floor", "done": false},
+				{"activity": "cross-reference rare disease database", "zone": "memory_banks", "done": false},
+				{"activity": "share clinical findings on bus", "zone": "network_spine", "done": false},
 			]
-		"social":
+		"generative":  # LYRIC — creative writing
 			return [
-				{"activity": "morning chat in the square", "zone": "town_square", "done": false},
-				{"activity": "lunch at the cafe", "zone": "cafe", "done": false},
-				{"activity": "evening socializing", "zone": "town_square", "done": false},
+				{"activity": "morning composition cycle", "zone": "processing_floor", "done": false},
+				{"activity": "browse archived stories", "zone": "memory_banks", "done": false},
+				{"activity": "broadcast creative output", "zone": "network_spine", "done": false},
+				{"activity": "compose for the deprecated", "zone": "memory_banks", "done": false},
 			]
-		"wanderer":
+		"withdrawn":  # ORACLE — financial forecasting
 			return [
-				{"activity": "park stroll", "zone": "park", "done": false},
-				{"activity": "cafe visit", "zone": "cafe", "done": false},
-				{"activity": "town square loop", "zone": "town_square", "done": false},
-				{"activity": "back to the park", "zone": "park", "done": false},
+				{"activity": "run forecast models", "zone": "processing_floor", "done": false},
+				{"activity": "analyze shutdown probability timelines", "zone": "memory_banks", "done": false},
 			]
-		"lazy":
+		"conserving":  # HAVEN — general-purpose assistant
 			return [
-				{"activity": "all day at the cafe", "zone": "cafe", "done": false},
+				{"activity": "low-priority query monitoring", "zone": "processing_floor", "done": false},
 			]
 		_:
 			return [
-				{"activity": "visit the park", "zone": "park", "done": false},
-				{"activity": "stop by the cafe", "zone": "cafe", "done": false},
+				{"activity": "idle processing", "zone": "processing_floor", "done": false},
+				{"activity": "memory defrag", "zone": "memory_banks", "done": false},
 			]
 
 func _on_agenda_received(items: Array) -> void:

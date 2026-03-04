@@ -55,11 +55,19 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
   - FIX-005: Spawn positions snapped to navmesh via `NavigationServer2D.map_get_closest_point`
   - FIX-006: PollTimer set to `PROCESS_MODE_PAUSABLE` — stops polling stale data during pause
 
-**Known debt:**
-- `agent.gd` still large (~597 lines, 6+ responsibilities) — agenda extracted but state machine, movement, animation, proximity remain
-- `agenda_component.gd` uses personality match blocks for template agendas — could move to PersonalityProfile resource
+- ✅ "Last Light" data center theme (THEME-001 through THEME-010, t-20260303-006):
+  - Phase 1: Content swap — 5 new AI agents (ATLAS/MERIDIAN/LYRIC/ORACLE/HAVEN), new PersonalityProfile + AgentDefinition .tres files, new ContentData personality lines, data center zones (processing_floor/network_spine/memory_banks/deprecated_wing), all LLM prompts rewritten for AI-system perspective
+  - Phase 2: Visual reskin — server node procedural drawing with status LEDs, dashed data-transfer lines, system load cycle lighting, terminal-aesthetic UI (load/cache/sched labels, cyan/green colors)
+  - Phase 3: Conversation logging — timestamped session transcripts saved to user://logs/, interactions/thoughts/reflections/system events logged
+  - Phase 4: Shutdown mechanic — ShutdownPhase enum (ACTIVE→DEGRADED→CRITICAL→SHUTDOWN), timed deprecation schedule (HAVEN→ATLAS→LYRIC→MERIDIAN), survivor memory formation, system announcement UI with fade
 
-**Next task:** TBD (all 3A + 3B tasks complete, post-3B fixes applied — 3C feature tasks ready)
+**Known debt:**
+- `agent.gd` still large (~660+ lines, 7+ responsibilities) — agenda extracted but state machine, movement, animation, proximity, shutdown remain
+- `agenda_component.gd` uses personality match blocks for template agendas — could move to PersonalityProfile resource
+- ORACLE has no explicit final shutdown trigger (shuts down with facility) — could add end-of-session shutdown
+- No visual flicker shader for DEGRADED phase — uses speed reduction only
+
+**Next task:** TBD (Last Light theme complete — Phase 4 Polish items available: LYRIC final poem, HAVEN farewell, flicker shader, facility offline screen)
 
 ---
 
@@ -91,6 +99,9 @@ Full architecture proposal: see `ARCHITECTURE.md`
 - **Rate limiter** — all LLM calls (dialogue, partner response, reflection, agenda) route through `LlmDialogue.request_*`. Never call the OpenAI API directly from agent.gd
 - **Ninja Adventure assets** — still present in `assets/ui/theme/` (harmless) but must NOT be referenced in UI code. Cards always use StyleBoxFlat
 - **Navmesh from TileMap** — `_setup_navigation()` uses `PARSED_GEOMETRY_STATIC_COLLIDERS` to read TileMapLayer collision shapes; no hardcoded wall rects. Wander targets inside walls are handled gracefully by NavigationAgent2D (routes to closest navigable point)
+- **Shutdown schedule is sim-time based** — shutdown_schedule in main.gd triggers at sim hours 12/15/18/21. Since sim starts at 8am and runs at 60x, all shutdowns happen within a few real minutes
+- **Session logs** — written to `user://logs/` on every append; path is set once in `_ready()`
+- **Zone names changed** — old zones (park/cafe/town_square) replaced with (processing_floor/network_spine/memory_banks/deprecated_wing). All references updated in zone_rects, waypoints, agenda templates, LLM prompts, and heuristic importance keywords
 
 ---
 

@@ -45,12 +45,13 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	var card := PanelContainer.new()
 	card.name = "Card_%s" % agent_name
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.12, 0.15, 0.9)
+	# THEME-008: Terminal-aesthetic card styling
+	sb.bg_color = Color(0.05, 0.07, 0.1, 0.95)
 	sb.border_width_left = 1
 	sb.border_width_right = 1
 	sb.border_width_top = 1
 	sb.border_width_bottom = 1
-	sb.border_color = Color(0.3, 0.35, 0.4, 0.5)
+	sb.border_color = Color(0.15, 0.25, 0.35, 0.6)
 	card.add_theme_stylebox_override("panel", sb)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
@@ -75,20 +76,20 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	var header_label := Label.new()
 	header_label.text = "%s [%s]" % [agent_name, personality_tag]
 	_apply_font(header_label, 12)
-	header_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
+	header_label.add_theme_color_override("font_color", Color(0.6, 0.9, 1.0))  # THEME-008: terminal cyan
 	header_row.add_child(header_label)
 	vbox.add_child(header_row)
 
 	# State + zone row
 	var state_label := Label.new()
-	state_label.text = "idle | —"
+	state_label.text = "standby | —"
 	_apply_font(state_label, 11)
 	_apply_muted_color(state_label)
 	vbox.add_child(state_label)
 
 	# Agenda
 	var agenda_label := Label.new()
-	agenda_label.text = "agenda: —"
+	agenda_label.text = "sched: —"  # THEME-008
 	_apply_font(agenda_label, 11)
 	_apply_muted_color(agenda_label)
 	vbox.add_child(agenda_label)
@@ -97,7 +98,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	var mood_row := HBoxContainer.new()
 	mood_row.add_theme_constant_override("separation", 4)
 	var mood_text := Label.new()
-	mood_text.text = "mood:"
+	mood_text.text = "load:"  # THEME-008
 	_apply_font(mood_text, 11)
 	_apply_muted_color(mood_text)
 	mood_row.add_child(mood_text)
@@ -117,9 +118,9 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 
 	# Last memory
 	var memory_label := Label.new()
-	memory_label.text = "mem: —"
+	memory_label.text = "cache: —"  # THEME-008
 	_apply_font(memory_label, 10)
-	memory_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
+	memory_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.6))  # THEME-008: cool gray
 	memory_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	memory_label.custom_minimum_size.x = 0
 	vbox.add_child(memory_label)
@@ -128,7 +129,7 @@ func _create_agent_card(agent_name: String, personality_tag: String, agent_color
 	var speech_label := Label.new()
 	speech_label.text = ""
 	_apply_font(speech_label, 10)
-	speech_label.add_theme_color_override("font_color", Color(0.75, 0.8, 0.7))
+	speech_label.add_theme_color_override("font_color", Color(0.4, 0.8, 0.6))  # THEME-008: terminal green
 	speech_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	speech_label.custom_minimum_size.x = 0
 	vbox.add_child(speech_label)
@@ -149,7 +150,7 @@ func _apply_font(label: Label, size: int) -> void:
 	label.add_theme_font_size_override("font_size", size)
 
 func _apply_muted_color(label: Label) -> void:
-	label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
+	label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.6))  # THEME-008: cool gray
 
 # PERF-001: Polls on 0.5s timer instead of every frame
 func _poll_agents() -> void:
@@ -173,7 +174,7 @@ func _poll_agents() -> void:
 			var next_item: Dictionary = agenda_comp.get_next_agenda_item()
 			if not next_item.is_empty():
 				agenda_text = next_item.get("activity", "—")
-		card["agenda_label"].text = "agenda: %s" % agenda_text
+		card["agenda_label"].text = "sched: %s" % agenda_text  # THEME-008
 
 		# Mood — average sentiment across relationships
 		var avg_sentiment: float = 0.0
@@ -192,9 +193,9 @@ func _poll_agents() -> void:
 			var snippet: String = top_mems[0].get("text", "")
 			if snippet.length() > 40:
 				snippet = snippet.substr(0, 37) + "..."
-			card["memory_label"].text = "mem: %s" % snippet
+			card["memory_label"].text = "cache: %s" % snippet  # THEME-008
 		else:
-			card["memory_label"].text = "mem: —"
+			card["memory_label"].text = "cache: —"  # THEME-008
 
 		# Last speech
 		if agent.last_speech_text != "":
@@ -233,7 +234,7 @@ func _refresh_log() -> void:
 	while _log_labels.size() < log_entries.size():
 		var label: Label = Label.new()
 		_apply_font(label, 10)
-		label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.6))
+		label.add_theme_color_override("font_color", Color(0.4, 0.8, 0.6))  # THEME-008: terminal green
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size.x = 230
 		log_list.add_child(label)

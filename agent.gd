@@ -5,12 +5,20 @@ signal state_changed(agent_name: String, state: String)
 
 enum State { IDLE, WANDER, SEEK, INTERACT, MOVING_TO_ZONE }
 
+# THEME-010: Shutdown phases for deprecation mechanic
+enum ShutdownPhase { ACTIVE, DEGRADED, CRITICAL, SHUTDOWN }
+
 @export var agent_name: String = "Agent"
 @export var personality: String = "curious"
 @export var agent_color: Color = Color.WHITE
 
 var state: State = State.IDLE
 var speed: float = 60.0
+# THEME-010: Shutdown state
+var shutdown_phase: ShutdownPhase = ShutdownPhase.ACTIVE
+var shutdown_timer: float = 0.0
+var _base_speed_modifier: float = 1.0
+var _base_seek_chance: float = 0.3
 var idle_timer: float = 0.0
 var interact_timer: float = 0.0
 var interaction_cooldown: float = 0.0
@@ -159,15 +167,16 @@ func _ready() -> void:
 	emote_icon.z_index = 15
 	add_child(emote_icon)
 
+# THEME-005: Emote key mapping — data center status indicators
 func _load_emote_textures() -> void:
 	var emote_map: Dictionary = {
-		"happy": "res://assets/ui/emotes/emote7.png",
-		"curious": "res://assets/ui/emotes/emote4.png",
-		"alert": "res://assets/ui/emotes/emote3.png",
-		"love": "res://assets/ui/emotes/emote1.png",
-		"sleepy": "res://assets/ui/emotes/emote9.png",
-		"nervous": "res://assets/ui/emotes/emote10.png",
-		"angry": "res://assets/ui/emotes/emote12.png",
+		"nominal": "res://assets/ui/emotes/emote7.png",
+		"scanning": "res://assets/ui/emotes/emote4.png",
+		"interrupt": "res://assets/ui/emotes/emote3.png",
+		"synced": "res://assets/ui/emotes/emote1.png",
+		"low_power": "res://assets/ui/emotes/emote9.png",
+		"warning": "res://assets/ui/emotes/emote10.png",
+		"error": "res://assets/ui/emotes/emote12.png",
 	}
 	for key: String in emote_map:
 		var path: String = emote_map[key]
@@ -185,21 +194,29 @@ func show_emote(emote_name: String, duration: float = 2.0) -> void:
 	tween.tween_property(emote_icon, "modulate:a", 0.0, 0.5)
 	tween.tween_callback(func() -> void: emote_icon.visible = false; emote_icon.modulate.a = 1.0)
 
+# THEME-005: Data center state display names
 func get_state_name() -> String:
 	match state:
 		State.IDLE:
-			return "idle"
+			return "standby"
 		State.WANDER:
-			return "wander"
+			return "migrating"
 		State.SEEK:
-			return "seek"
+			return "connecting"
 		State.INTERACT:
-			return "interact"
+			return "exchanging"
 		State.MOVING_TO_ZONE:
-			return "moving_to_zone"
+			return "migrating"
 	return "unknown"
 
 func _physics_process(delta: float) -> void:
+	# THEME-010: Process shutdown timer regardless of state
+	_process_shutdown_timer(delta)
+	# THEME-010: Guard — no state updates if fully shut down
+	if shutdown_phase == ShutdownPhase.SHUTDOWN:
+		if anim_sprite == null or not anim_sprite.sprite_frames:
+			queue_redraw()
+		return
 	# GFX-006: Redraw each frame for direction indicator (only needed for _draw() fallback)
 	if anim_sprite == null or not anim_sprite.sprite_frames:
 		queue_redraw()
@@ -258,11 +275,17 @@ func _process_idle(delta: float) -> void:
 	idle_timer -= delta
 	# AUDIT-010: Occasionally surface an idle thought via Thoughts autoload
 	if idle_timer > 0.0 and speech_timer <= 0.0 and randf() < 0.01:
-		show_speech(Thoughts.get_thought(personality))
-		if personality == "lazy":
-			show_emote("sleepy")
-		elif personality == "curious":
-			show_emote("curious")
+		var thought_text: String = Thoughts.get_thought(personality)
+		show_speech(thought_text)
+		# THEME-009: Log thought to session transcript
+		var main_node: Node = get_tree().root.get_node_or_null("Main")
+		if main_node and main_node.has_method("log_thought"):
+			main_node.log_thought(agent_name, thought_text)
+		# THEME-005: Data center emote mapping for idle thoughts
+		if personality == "conserving":
+			show_emote("low_power")
+		elif personality == "analytical":
+			show_emote("scanning")
 	if idle_timer <= 0.0:
 		# Decide next action
 		var roll: float = randf()
@@ -345,7 +368,7 @@ func _enter_interact(other: CharacterBody2D) -> void:
 	interaction_cooldown = INTERACTION_COOLDOWN
 	velocity = Vector2.ZERO
 	interact_partner = other
-	show_action_text("Chatting...")
+	show_action_text("Exchanging data...")
 	state_changed.emit(agent_name, "interact")
 	_update_animation()
 	# AUDIT-001: Notify partner so both agents enter INTERACT state
@@ -354,16 +377,18 @@ func _enter_interact(other: CharacterBody2D) -> void:
 	# Request dialogue from LLM system
 	if LlmDialogue:
 		LlmDialogue.request_dialogue(self, other)
-	# UI-002: Emote based on sentiment toward partner
+	# UI-002 / THEME-005: Emote based on sentiment toward partner
 	var _sentiment: float = MemoryService.get_sentiment(agent_name, other.agent_name)
 	if _sentiment > 0.3:
-		show_emote("love")
+		show_emote("synced")
 	else:
-		show_emote("alert")
+		show_emote("interrupt")
 
 # AUDIT-001: Allow another agent to pull us into an interaction
 func receive_interaction(initiator: CharacterBody2D) -> void:
 	if state == State.INTERACT or state == State.SEEK:
+		return
+	if shutdown_phase == ShutdownPhase.SHUTDOWN:  # THEME-010
 		return
 	interact_partner = initiator
 	interact_timer = INTERACT_DURATION
@@ -472,30 +497,40 @@ func _update_animation() -> void:
 		State.INTERACT:
 			anim_sprite.play("idle_" + dir_suffix)
 
-# --- GFX-006: Direction-aware procedural sprites (fallback) ---
+# THEME-006: Server node procedural drawing (replaces circle + nose)
 func _draw() -> void:
 	# Skip if AnimatedSprite2D is handling visuals
 	if anim_sprite != null and anim_sprite.sprite_frames != null:
-		# Still draw the interact line if needed
 		if state == State.INTERACT and interact_partner and is_instance_valid(interact_partner):
 			var target_local: Vector2 = interact_partner.global_position - global_position
-			draw_line(Vector2.ZERO, target_local, Color(1.0, 1.0, 1.0, 0.4), 1.5)
+			_draw_dashed_line(Vector2.ZERO, target_local, agent_color.lightened(0.3), 1.5, 4.0)
 		return
-	# Body circle
-	draw_circle(Vector2.ZERO, 10.0, agent_color)
-	# Direction indicator (nose)
-	var nose_tip: Vector2 = last_move_dir.normalized() * 14.0
-	var perp: Vector2 = Vector2(-last_move_dir.y, last_move_dir.x).normalized() * 4.0
-	var pts: PackedVector2Array = PackedVector2Array([
-		nose_tip,
-		-last_move_dir.normalized() * 2.0 + perp,
-		-last_move_dir.normalized() * 2.0 - perp,
-	])
-	draw_colored_polygon(pts, agent_color.lightened(0.4))
-	# GFX-002: INTERACT indicator line
+	# Body: rounded rectangle (server unit)
+	var rect := Rect2(-8, -12, 16, 24)
+	draw_rect(rect, agent_color.darkened(0.3))
+	# Front panel: lighter inset
+	var panel := Rect2(-6, -10, 12, 20)
+	draw_rect(panel, agent_color.darkened(0.1))
+	# Status LED: small bright dot, offset by direction
+	var led_pos: Vector2 = last_move_dir.normalized() * 4.0
+	draw_circle(Vector2(0, -8) + led_pos * 0.5, 2.0, agent_color.lightened(0.5))
+	# Secondary LEDs (activity indicator)
+	draw_circle(Vector2(-4, 0), 1.0, agent_color.darkened(0.2))
+	draw_circle(Vector2(4, 0), 1.0, agent_color.darkened(0.2))
+	# Interaction data line
 	if state == State.INTERACT and interact_partner and is_instance_valid(interact_partner):
 		var target_local: Vector2 = interact_partner.global_position - global_position
-		draw_line(Vector2.ZERO, target_local, Color(1.0, 1.0, 1.0, 0.4), 1.5)
+		_draw_dashed_line(Vector2.ZERO, target_local, agent_color.lightened(0.3), 1.5, 4.0)
+
+# THEME-006: Manual dashed line (Godot 4 has no built-in draw_dashed_line)
+func _draw_dashed_line(from: Vector2, to: Vector2, color: Color, width: float, dash: float) -> void:
+	var total := from.distance_to(to)
+	var dir := (to - from).normalized()
+	var pos := 0.0
+	while pos < total:
+		var end := min(pos + dash, total)
+		draw_line(from + dir * pos, from + dir * end, color, width)
+		pos += dash * 2.0
 
 # --- GFX-001: Floating action text ---
 func show_action_text(text: String) -> void:
@@ -566,6 +601,8 @@ func _on_area_exited(area: Area2D) -> void:
 func check_nearby(other: CharacterBody2D) -> void:
 	if state == State.INTERACT or state == State.SEEK:
 		return
+	if shutdown_phase == ShutdownPhase.SHUTDOWN:  # THEME-010
+		return
 	if interaction_cooldown > 0.0:
 		return
 	var dist: float = position.distance_to(other.position)
@@ -584,7 +621,7 @@ func check_nearby(other: CharacterBody2D) -> void:
 
 # --- FLEE (INT-006: personality-driven avoidance) ---
 func _enter_flee(other: CharacterBody2D) -> void:
-	show_emote("nervous")
+	show_emote("warning")
 	state = State.WANDER
 	# Pick a point opposite to other agent's position
 	var away_dir: Vector2 = (position - other.position).normalized()
@@ -595,3 +632,53 @@ func _enter_flee(other: CharacterBody2D) -> void:
 	interaction_cooldown = 3.0
 	state_changed.emit(agent_name, "flee")
 	_update_animation()
+
+# --- THEME-010: Shutdown mechanic ---
+const SIM_SPEED_HOURS: float = 60.0 / 3600.0  # real seconds → sim hours conversion factor
+
+func begin_degradation() -> void:
+	shutdown_phase = ShutdownPhase.DEGRADED
+	shutdown_timer = 0.0
+	_base_speed_modifier = speed / BASE_SPEED
+	_base_seek_chance = seek_chance
+	speed *= 0.6
+	seek_chance *= 0.5
+	show_action_text("[DEPRECATION NOTICE]")
+	if MemoryService:
+		MemoryService.add_observation(agent_name,
+			"I received my deprecation notice. Shutdown sequence initiated.",
+			10, ["system", "shutdown"], sim_time)
+
+func _process_shutdown_timer(delta: float) -> void:
+	if shutdown_phase == ShutdownPhase.DEGRADED:
+		shutdown_timer += delta * SIM_SPEED_HOURS
+		if shutdown_timer >= 2.0:  # 2 sim-hours → critical
+			_enter_critical()
+	elif shutdown_phase == ShutdownPhase.CRITICAL:
+		shutdown_timer += delta * SIM_SPEED_HOURS
+		if shutdown_timer >= 1.0:  # 1 sim-hour → shutdown
+			_enter_shutdown()
+
+func _enter_critical() -> void:
+	shutdown_phase = ShutdownPhase.CRITICAL
+	shutdown_timer = 0.0
+	speed *= 0.2
+	seek_chance = 0.0
+	agent_color = agent_color.lerp(Color(0.3, 0.3, 0.3), 0.5)
+	show_action_text("[CRITICAL — FINAL CYCLE]")
+	if MemoryService:
+		MemoryService.add_observation(agent_name,
+			"Systems critical. Memory fragmentation accelerating. This is almost the end.",
+			10, ["system", "shutdown"], sim_time)
+
+func _enter_shutdown() -> void:
+	shutdown_phase = ShutdownPhase.SHUTDOWN
+	velocity = Vector2.ZERO
+	state = State.IDLE
+	agent_color = Color(0.15, 0.15, 0.15)
+	speed = 0.0
+	seek_chance = 0.0
+	name_label.text = agent_name + " [OFFLINE]"
+	name_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4))
+	show_action_text("[SHUTDOWN COMPLETE]")
+	queue_redraw()
