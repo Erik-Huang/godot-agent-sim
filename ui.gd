@@ -28,6 +28,12 @@ func _setup_panel_background() -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.08, 0.09, 0.12, 1.0)
 	add_theme_stylebox_override("panel", sb)
+	# UI-004: Black 50% transparent background for log scroll area only
+	var log_scroll: ScrollContainer = get_node_or_null("LogScroll")
+	if log_scroll:
+		var log_bg := StyleBoxFlat.new()
+		log_bg.bg_color = Color(0.0, 0.0, 0.0, 0.5)
+		log_scroll.add_theme_stylebox_override("panel", log_bg)
 
 func register_agent(agent: CharacterBody2D) -> void:
 	agent_refs.append(agent)

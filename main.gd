@@ -259,10 +259,6 @@ func _generate_spawn_positions(count: int) -> Array[Vector2]:
 
 func _spawn_agents() -> void:
 	var spawn_positions: Array[Vector2] = _generate_spawn_positions(roster.agents.size())
-	# FIX-005: Snap spawn positions to navmesh to avoid landing inside wall tiles
-	var map_rid: RID = nav_region.get_navigation_map()
-	for i in range(spawn_positions.size()):
-		spawn_positions[i] = NavigationServer2D.map_get_closest_point(map_rid, spawn_positions[i])
 	# ARCH-004: Iterate roster resources instead of hardcoded dictionaries
 	for i in range(roster.agents.size()):
 		var def: AgentDefinition = roster.agents[i]
