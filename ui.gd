@@ -19,6 +19,7 @@ func _ready() -> void:
 	poll_timer.name = "PollTimer"
 	poll_timer.wait_time = 0.5
 	poll_timer.autostart = true
+	poll_timer.process_mode = Node.PROCESS_MODE_PAUSABLE  # FIX-006: stop polling during pause
 	add_child(poll_timer)
 	poll_timer.timeout.connect(_poll_agents)
 

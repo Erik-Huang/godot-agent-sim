@@ -23,6 +23,7 @@ var seek_chance: float = 0.3
 var approach_tendency: float = 0.0
 var profile: PersonalityProfile
 var _rolled_for: Dictionary = {}  # AUDIT-002: track per-encounter rolls
+var _is_agenda_move: bool = false  # FIX-004: track agenda-driven MOVING_TO_ZONE
 
 # GFX-006: AnimatedSprite2D for Ninja Adventure sprites
 var anim_sprite: AnimatedSprite2D = null
@@ -401,6 +402,7 @@ func show_speech(text: String) -> void:
 
 # --- MOVING_TO_ZONE ---
 func _enter_moving_to_zone() -> void:
+	_is_agenda_move = false  # FIX-004: not agenda-driven
 	state = State.MOVING_TO_ZONE
 	# Pick a random different zone
 	var zone_names: Array = zone_rects.keys()
@@ -428,14 +430,17 @@ func _process_moving_to_zone(_delta: float) -> void:
 	# AUDIT-014: Allow interactions while traveling between zones
 	_poll_nearby_agents()
 	if nav_agent.is_navigation_finished():
-		# INT-004 / ARCH-005: Mark current agenda item done on arrival
-		agenda_component.mark_current_done()
+		# FIX-004: Only mark agenda done for agenda-driven moves
+		if _is_agenda_move:
+			agenda_component.mark_current_done()
+		_is_agenda_move = false
 		_enter_idle()
 		return
 	_move_toward_nav_target()
 
 # ARCH-005: Agenda signal handler — moves agent to follow an agenda item
 func _on_agenda_move_requested(target_pos: Vector2, activity: String) -> void:
+	_is_agenda_move = true  # FIX-004: agenda-driven move
 	nav_agent.target_position = target_pos
 	show_action_text("→ %s" % activity)
 	state = State.MOVING_TO_ZONE

@@ -50,12 +50,16 @@ A generative agent simulation in Godot 4. Five AI-driven agents wander a 2D worl
 - ✅ AgendaComponent extracted from agent.gd (ARCH-005, t-20260303-005) — agenda data, LLM request, templates in dedicated child node
 - ✅ UI layout moved to main.tscn (ARCH-006, t-20260303-005) — CanvasLayer/ScreenRoot/OuterPanel declarative, 70-line reparenting block deleted
 - ✅ Dynamic spawn positions from zone_rects (ARCH-007, t-20260303-005) — replaces hardcoded array, 40px margin, 60px spacing
+- ✅ Post-3B regression fixes (FIX-004/005/006, t-20260303-006):
+  - FIX-004: `_is_agenda_move` flag — `mark_current_done` no longer fires on random zone changes
+  - FIX-005: Spawn positions snapped to navmesh via `NavigationServer2D.map_get_closest_point`
+  - FIX-006: PollTimer set to `PROCESS_MODE_PAUSABLE` — stops polling stale data during pause
 
 **Known debt:**
-- `agent.gd` still large (~593 lines, 6+ responsibilities) — agenda extracted but state machine, movement, animation, proximity remain
+- `agent.gd` still large (~597 lines, 6+ responsibilities) — agenda extracted but state machine, movement, animation, proximity remain
 - `agenda_component.gd` uses personality match blocks for template agendas — could move to PersonalityProfile resource
 
-**Next task:** TBD (all 3A + 3B tasks complete — 3C feature tasks ready)
+**Next task:** TBD (all 3A + 3B tasks complete, post-3B fixes applied — 3C feature tasks ready)
 
 ---
 
