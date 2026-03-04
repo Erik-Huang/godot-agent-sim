@@ -3,3 +3,4 @@
 .godot/shader_cache/
 .godot/imported/
 .godot/uid_cache.bin
+*.import
