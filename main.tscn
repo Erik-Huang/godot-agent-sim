@@ -115,7 +115,8 @@ anchor_left = 0.8
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="UIPanel" type="VBoxContainer" parent="UILayer/ScreenRoot/OuterPanel" unique_name_in_owner=true]
+[node name="UIPanel" type="VBoxContainer" parent="UILayer/ScreenRoot/OuterPanel"]
+unique_name_in_owner = true
 unique_id = 935282020
 layout_mode = 2
 size_flags_horizontal = 3
