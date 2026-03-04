@@ -1,9 +1,5 @@
 # Godot editor files (machine-specific, don't commit)
 .godot/editor/
 .godot/shader_cache/
-
-# Keep imported asset cache (needed for headless/CI builds)
-# .godot/imported/ -- intentionally NOT ignored
-
-# Godot 4 uid cache (regenerated)
+.godot/imported/
 .godot/uid_cache.bin
