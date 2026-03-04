@@ -528,7 +528,7 @@ func _draw_dashed_line(from: Vector2, to: Vector2, color: Color, width: float, d
 	var dir := (to - from).normalized()
 	var pos := 0.0
 	while pos < total:
-		var end := min(pos + dash, total)
+		var end: float = minf(pos + dash, total)
 		draw_line(from + dir * pos, from + dir * end, color, width)
 		pos += dash * 2.0
 
